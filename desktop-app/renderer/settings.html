@@ -42,6 +42,23 @@
         </fieldset>
 
         <fieldset>
+          <legend>Discord (opcjonalnie - drugie źródło awatarów)</legend>
+          <p>
+            <label for="discordClientId">Discord Client ID (z discord.com/developers/applications)</label><br />
+            <input type="text" id="discordClientId" name="discordClientId" size="40" />
+          </p>
+          <p>
+            Wymaga uruchomionego i zalogowanego desktopowego klienta Discord oraz
+            zalogowanego klienta League of Legends na tym komputerze - avatar
+            Discorda zostanie zapisany dla aktualnie zalogowanego gracza League.
+          </p>
+          <p>
+            <button type="button" id="discord-connect-btn">Połącz z Discordem i zapisz mój avatar</button>
+            <span id="discord-connect-result"></span>
+          </p>
+        </fieldset>
+
+        <fieldset>
           <legend>Lokalizacja danych i klienta League</legend>
           <p>
             <label for="dataDir">Folder zapisu danych lokalnych (JSON)</label><br />

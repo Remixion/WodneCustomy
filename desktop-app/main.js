@@ -6,6 +6,10 @@ const { enrichPlayer } = require('./src/collector/playerProfile');
 const { LocalStore } = require('./src/storage/localStore');
 const { ConfigStore } = require('./src/config/configStore');
 const { postToAppsScript, getFromAppsScript } = require('./src/sync/sheetsClient');
+const { connectDiscordRpc, buildDiscordAvatarUrl } = require('./src/discord/discordRpc');
+const { getCurrentSummonerPuuid } = require('./src/lcu/currentSummoner');
+const { findLeagueClient } = require('./src/lcu/lockfile');
+const { LcuClient } = require('./src/lcu/client');
 
 let mainWindow;
 let configStore;
@@ -152,3 +156,46 @@ ipcMain.handle('sync:test-connection', async () => {
 
 // ---- IPC: status LCU na żądanie (np. po otwarciu okna) ----
 ipcMain.handle('lcu:get-status', () => (watcher ? { connected: watcher.lastPhase !== 'DISCONNECTED' && watcher.lastPhase !== null, phase: watcher.lastPhase } : { connected: false }));
+
+// ---- IPC: drugie źródło awatarów - Discord (lokalny klient przez IPC) ----
+ipcMain.handle('discord:connect', async () => {
+  const cfg = configStore.getAll();
+  if (!cfg.discordClientId) {
+    return { ok: false, error: 'Brak skonfigurowanego Discord Client ID (zakładka Ustawienia).' };
+  }
+
+  let discordUser;
+  try {
+    discordUser = await connectDiscordRpc(cfg.discordClientId);
+  } catch (err) {
+    return { ok: false, error: `Nie udało się połączyć z Discordem: ${err.message}` };
+  }
+
+  let puuid;
+  try {
+    const info = findLeagueClient(cfg.customLockfilePath);
+    if (!info) throw new Error('Klient League of Legends nie jest uruchomiony.');
+    const client = new LcuClient(info);
+    puuid = await getCurrentSummonerPuuid(client);
+    if (!puuid) throw new Error('Nie udało się odczytać puuid zalogowanego gracza.');
+  } catch (err) {
+    return { ok: false, error: `Połączono z Discordem (${discordUser.username}), ale nie udało się dopasować do gracza League: ${err.message}` };
+  }
+
+  const avatarUrl = buildDiscordAvatarUrl(discordUser);
+  const discordFields = {
+    puuid,
+    discordUserId: discordUser.id,
+    discordAvatarHash: discordUser.avatar || '',
+    discordAvatarUrl: avatarUrl,
+  };
+  store.upsertPlayers([discordFields]);
+
+  let syncResult = null;
+  const cfgNow = configStore.getAll();
+  if (cfgNow.appsScriptUrl) {
+    syncResult = await postToAppsScript(cfgNow.appsScriptUrl, cfgNow.sharedSecret, 'syncPlayers', { players: [discordFields] });
+  }
+
+  return { ok: true, puuid, discordUser, avatarUrl, syncResult };
+});

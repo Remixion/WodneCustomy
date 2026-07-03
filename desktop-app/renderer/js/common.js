@@ -123,3 +123,18 @@ async function getProfileIconUrl(profileIconId) {
   const version = await getDdragonVersion();
   return `https://ddragon.leagueoflegends.com/cdn/${version}/img/profileicon/${profileIconId}.png`;
 }
+
+/**
+ * Zwraca URL awatara gracza zgodnie z wybranym domyślnym źródłem (pole "avatarSource"):
+ * "discord" (zapisany awatar z Discorda) albo domyślnie "lol" (ikona profilu z League).
+ * Jeśli preferowane źródło jest niedostępne, próbuje drugiego jako zapasowego.
+ */
+async function getPlayerAvatarUrl(player) {
+  if (!player) return '';
+  if (player.avatarSource === 'discord') {
+    if (player.discordAvatarUrl) return player.discordAvatarUrl;
+    return getProfileIconUrl(player.profileIconId);
+  }
+  const lolUrl = await getProfileIconUrl(player.profileIconId);
+  return lolUrl || player.discordAvatarUrl || '';
+}

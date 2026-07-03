@@ -14,7 +14,7 @@ async function renderPlayerList(players, individualStatsByPuuid) {
     img.width = 32;
     img.height = 32;
     img.alt = '';
-    const iconUrl = await getProfileIconUrl(player.profileIconId);
+    const iconUrl = await getPlayerAvatarUrl(player);
     if (iconUrl) img.src = iconUrl;
     avatarTd.appendChild(img);
     tr.appendChild(avatarTd);
@@ -60,7 +60,7 @@ async function renderProfileDetail(puuid, data, individualStats) {
   document.getElementById('profile-name').innerHTML = colorizeName(name, color);
 
   const avatarImg = document.getElementById('profile-avatar');
-  const iconUrl = await getProfileIconUrl(player && player.profileIconId);
+  const iconUrl = await getPlayerAvatarUrl(player);
   if (iconUrl) avatarImg.src = iconUrl;
   avatarImg.alt = name;
 

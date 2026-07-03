@@ -11,6 +11,7 @@ class ConfigStore {
       dataDir: defaultDataDir,
       customLockfilePath: '',
       autoSync: true,
+      discordClientId: '',
     };
     this.data = this.load();
   }

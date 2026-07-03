@@ -115,12 +115,15 @@ Dane trafiają do trzech podarkuszy w Arkuszu Google:
   po każdym meczu: **nick** (ogólna, dowolna nazwa gracza - nie musi być tym
   samym co nazwa w League of Legends), **color** (opcjonalny własny kolor
   hex nicku - jeśli pusty, kolor jest przydzielany automatycznie z palety na
-  podstawie `puuid`), nazwa przywoływacza, poziom konta, ranga solo/flex
+  podstawie `puuid`), **avatarSource** (`lol` albo `discord` - wybór
+  domyślnego źródła awatara), **discordUserId** / **discordAvatarHash** /
+  **discordAvatarUrl** (dane avataru z Discorda, patrz sekcja "Drugie źródło
+  awatarów" niżej), nazwa przywoływacza, poziom konta, ranga solo/flex
   (tier, dywizja, LP, bilans W/L), TOP 3 najbardziej opanowanych bohaterów
   wraz z punktami mistrzostwa, łączny wynik mistrzostwa, notatki.
 
-Ręcznie wpisane pola (`notes`, `nick`, `color`) nigdy nie są nadpisywane przez
-automatyczną synchronizację danych z gry.
+Ręcznie wpisane pola (`notes`, `nick`, `color`, `avatarSource`) nigdy nie są
+nadpisywane przez automatyczną synchronizację danych z gry.
 
 ## Zakładka Statystyki
 
@@ -148,13 +151,45 @@ przywoływacza z League of Legends.
 Zakładka **Profile** pozwala wybrać konkretnego gracza z listy (z awatarem i
 kolorowym nickiem) i zobaczyć jego pełny profil:
 
-- awatar pobierany z Data Dragon na podstawie `profileIconId`,
+- awatar - z League of Legends (Data Dragon, na podstawie `profileIconId`) albo
+  z Discorda, zależnie od wybranego domyślnego źródła (patrz niżej),
 - kolorowy nick (patrz sekcja "Kolor gracza" niżej),
 - nazwa przywoływacza, poziom konta, ranga Solo/Duo i Flex,
 - zbiorcze statystyki: liczba gier, bilans W/L, średnie KDA, ulubiony
   champion i rola,
 - tabela ostatnich 10 rozegranych meczów tego gracza (data, champion, wynik,
   K/D/A, KDA, CS, obrażenia) z linkiem do pełnych szczegółów meczu.
+
+### Drugie źródło awatarów - Discord
+
+Apka desktopowa potrafi pobrać avatar z **lokalnie uruchomionego klienta
+Discord** jako alternatywę dla ikony profilu z League of Legends:
+
+1. Załóż darmową aplikację na [discord.com/developers/applications](https://discord.com/developers/applications)
+   ("New Application", dowolna nazwa) - nie trzeba dodawać bota ani niczego
+   konfigurować, potrzebny jest tylko **Application ID** ze strony "General
+   Information" (to jest Twój `discordClientId`).
+2. W apce desktopowej, w zakładce **Ustawienia**, wklej ten identyfikator w
+   polu Discord Client ID i zapisz.
+3. Upewnij się, że desktopowy klient Discord jest uruchomiony i zalogowany, a
+   klient League of Legends jest uruchomiony i zalogowany.
+4. Kliknij **Połącz z Discordem i zapisz mój avatar** - aplikacja połączy się
+   z Discordem lokalnie (bez okna logowania - to podstawowa informacja o
+   koncie, tak jak przy standardowej integracji Rich Presence w grach),
+   odczyta Twój avatar oraz dopasuje go do Twojego gracza League (po
+   `puuid` aktualnie zalogowanego konta) i zsynchronizuje z Arkuszem.
+5. Każdy gracz w drużynie powtarza ten krok na swoim komputerze, żeby jego
+   avatar Discorda pojawił się w danych współdzielonych przez wszystkich.
+6. W zakładce **Gracze** wybierz w polu **avatarSource** wartość `Discord`
+   dla graczy, u których avatar Discorda ma mieć pierwszeństwo przed ikoną
+   profilu z League (domyślnie brany jest avatar z League of Legends).
+
+Ta funkcja działa wyłącznie w apce desktopowej (wymaga lokalnego dostępu do
+klienta Discord przez IPC, niedostępnego z poziomu przeglądarki). Na stronie
+GitHub Pages oraz w apce desktopowej można też **ręcznie** wkleić dowolny
+link do obrazka w polu **discordAvatarUrl** w zakładce Gracze - to działa
+bez połączenia z Discordem, np. gdy ktoś nie chce uruchamiać apki
+desktopowej.
 
 ### Kolor gracza
 

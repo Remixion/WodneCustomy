@@ -25,6 +25,9 @@ contextBridge.exposeInMainWorld('api', {
     getStatus: () => ipcRenderer.invoke('lcu:get-status'),
     onStatus: (cb) => ipcRenderer.on('lcu:status', (_evt, data) => cb(data)),
   },
+  discord: {
+    connect: () => ipcRenderer.invoke('discord:connect'),
+  },
   collector: {
     onStatus: (cb) => ipcRenderer.on('collector:status', (_evt, data) => cb(data)),
     onMatchSaved: (cb) => ipcRenderer.on('collector:match-saved', (_evt, data) => cb(data)),
