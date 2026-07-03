@@ -112,12 +112,35 @@ Dane trafiają do trzech podarkuszy w Arkuszu Google:
   score, wardy, przedmioty (0-6), pierwsza krew/wieża, wielokrotne zabójstwa,
   wynik (wygrana/przegrana), notatki.
 - **`Players`** - jeden wiersz na unikalnego gracza (po `puuid`), aktualizowany
-  po każdym meczu: poziom konta, ranga solo/flex (tier, dywizja, LP, bilans
-  W/L), TOP 3 najbardziej opanowanych bohaterów wraz z punktami mistrzostwa,
-  łączny wynik mistrzostwa, notatki.
+  po każdym meczu: **nick** (ogólna, dowolna nazwa gracza - nie musi być tym
+  samym co nazwa w League of Legends), nazwa przywoływacza, poziom konta,
+  ranga solo/flex (tier, dywizja, LP, bilans W/L), TOP 3 najbardziej
+  opanowanych bohaterów wraz z punktami mistrzostwa, łączny wynik
+  mistrzostwa, notatki.
 
-Ręcznie wpisane notatki (`notes`) nigdy nie są nadpisywane przez automatyczną
-synchronizację danych z gry.
+Ręcznie wpisane pola (`notes`, `nick`) nigdy nie są nadpisywane przez
+automatyczną synchronizację danych z gry.
+
+## Zakładka Statystyki
+
+Zarówno strona GitHub Pages, jak i apka desktopowa, mają zakładkę
+**Statystyki** licząca się na bieżąco z zebranych meczów:
+
+- **Statystyki ogólne** - liczba meczów, łączny i średni czas gry, najdłuższy/
+  najkrótszy mecz, bilans zwycięstw drużyny niebieskiej vs czerwonej,
+  najczęściej wybierany i banowany champion, łączna liczba zabójstw i
+  Pentakilli.
+- **Rankingi** - listy TOP 10 graczy według: liczby zwycięstw, % wygranych
+  (min. 3 gry), liczby rozegranych gier, średniego KDA, łącznych zabójstw i
+  asyst, średnich obrażeń zadanych bohaterom, średniego Vision Score,
+  Pentakilli oraz pierwszych krwi.
+- **Statystyki indywidualne** - jedna zbiorcza tabela na gracza z pełnym
+  zestawem uśrednionych i sumarycznych statystyk oraz ulubionym championem i
+  rolą.
+
+Wszędzie tam, gdzie wyświetlane jest imię gracza, pierwszeństwo ma **nick**
+(jeśli ustawiony w zakładce Gracze), w przeciwnym razie używana jest nazwa
+przywoływacza z League of Legends.
 
 ## Uwagi i ograniczenia
 

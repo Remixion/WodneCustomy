@@ -30,9 +30,13 @@ async function load() {
     }
     statusEl.textContent = `Mecz ${match.matchId}`;
     renderMatchFields(match);
+    const nickByPuuid = {};
+    (data.players || []).forEach((p) => {
+      if (p.puuid) nickByPuuid[p.puuid] = p.nick || '';
+    });
     const players = data.matchPlayers.filter((p) => String(p.matchId) === String(matchId));
-    renderTeamTable('blue-team-table', players.filter((p) => p.team === 'BLUE'));
-    renderTeamTable('red-team-table', players.filter((p) => p.team === 'RED'));
+    renderTeamTable('blue-team-table', players.filter((p) => p.team === 'BLUE'), nickByPuuid);
+    renderTeamTable('red-team-table', players.filter((p) => p.team === 'RED'), nickByPuuid);
   } catch (err) {
     statusEl.textContent = `Błąd wczytywania danych: ${err.message}`;
   }
@@ -79,7 +83,7 @@ function renderMatchFields(match) {
   tbody.appendChild(rawTr);
 }
 
-function renderTeamTable(tableId, players) {
+function renderTeamTable(tableId, players, nickByPuuid) {
   const table = document.getElementById(tableId);
   const thead = table.querySelector('thead');
   const tbody = table.querySelector('tbody');
@@ -87,6 +91,9 @@ function renderTeamTable(tableId, players) {
   tbody.innerHTML = '';
 
   const headRow = document.createElement('tr');
+  const nickTh = document.createElement('th');
+  nickTh.textContent = 'Nick (z zakładki Gracze)';
+  headRow.appendChild(nickTh);
   const cornerTh = document.createElement('th');
   cornerTh.textContent = 'puuid';
   headRow.appendChild(cornerTh);
@@ -100,7 +107,7 @@ function renderTeamTable(tableId, players) {
   if (!players.length) {
     const tr = document.createElement('tr');
     const td = document.createElement('td');
-    td.colSpan = PLAYER_FIELDS.length + 1;
+    td.colSpan = PLAYER_FIELDS.length + 2;
     td.textContent = 'Brak danych graczy.';
     tr.appendChild(td);
     tbody.appendChild(tr);
@@ -109,6 +116,9 @@ function renderTeamTable(tableId, players) {
 
   players.forEach((player) => {
     const tr = document.createElement('tr');
+    const nickTd = document.createElement('td');
+    nickTd.textContent = (nickByPuuid && nickByPuuid[player.puuid]) || '';
+    tr.appendChild(nickTd);
     const puuidTd = document.createElement('td');
     puuidTd.textContent = player.puuid ? String(player.puuid).slice(0, 8) + '...' : '';
     tr.appendChild(puuidTd);

@@ -1,5 +1,5 @@
 const PLAYER_FIELDS = [
-  'summonerName', 'summonerId', 'accountId', 'profileIconId', 'summonerLevel',
+  'nick', 'summonerName', 'summonerId', 'accountId', 'profileIconId', 'summonerLevel',
   'soloTier', 'soloRank', 'soloLP', 'soloWins', 'soloLosses', 'soloWinRatePct',
   'flexTier', 'flexRank', 'flexLP', 'flexWins', 'flexLosses', 'flexWinRatePct',
   'top1ChampionName', 'top1ChampionPoints', 'top2ChampionName', 'top2ChampionPoints',
@@ -42,7 +42,7 @@ async function loadPlayers() {
       const input = document.createElement('input');
       input.type = 'text';
       input.value = player[field] != null ? player[field] : '';
-      input.size = field === 'summonerName' ? 20 : 8;
+      input.size = field === 'summonerName' || field === 'nick' ? 20 : 8;
       input.addEventListener('change', async () => {
         await window.api.store.updatePlayerField(player.puuid, field, input.value);
         logEvent(`Zapisano ${field} dla ${player.summonerName || player.puuid}`);

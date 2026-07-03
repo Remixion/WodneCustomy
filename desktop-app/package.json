@@ -9,8 +9,8 @@
     "dist": "electron-builder"
   },
   "devDependencies": {
-    "electron": "^31.0.0",
-    "electron-builder": "^24.13.3"
+    "electron": "^43.0.0",
+    "electron-builder": "^26.15.3"
   },
   "build": {
     "appId": "com.wodnecustomy.desktop",
@@ -21,8 +21,14 @@
       "src/**/*",
       "renderer/**/*"
     ],
-    "win": { "target": "nsis" },
-    "mac": { "target": "dmg" },
-    "linux": { "target": "AppImage" }
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
   }
 }
