@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <title>WodneCustomy - Mecze</title>
+</head>
+<body>
+  <header>
+    <h1>WodneCustomy</h1>
+    <nav>
+      <ul>
+        <li><a href="index.html">Mecze</a></li>
+        <li><a href="players.html">Gracze</a></li>
+        <li><a href="settings.html">Ustawienia</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <section id="lcu-section">
+      <h2>Status klienta League of Legends</h2>
+      <dl>
+        <dt>Połączenie z LCU</dt>
+        <dd id="lcu-connected">nieznane</dd>
+        <dt>Faza gry</dt>
+        <dd id="lcu-phase">-</dd>
+        <dt>Zbieranie danych</dt>
+        <dd id="collector-status">bezczynny</dd>
+      </dl>
+    </section>
+
+    <section id="matches-section">
+      <h2>Zarejestrowane mecze</h2>
+      <p>
+        <button id="refresh-btn" type="button">Odśwież listę</button>
+        <button id="push-all-btn" type="button">Wyślij wszystkie mecze do Google Sheets</button>
+      </p>
+      <table id="matches-table" border="1">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Tryb</th>
+            <th>Mapa</th>
+            <th>Czas trwania</th>
+            <th>Zwycięska drużyna</th>
+            <th>Bany (niebiescy)</th>
+            <th>Bany (czerwoni)</th>
+            <th>Notatki</th>
+            <th>Akcje</th>
+          </tr>
+        </thead>
+        <tbody id="matches-tbody">
+          <tr><td colspan="9">Wczytywanie...</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="log-section">
+      <h2>Dziennik zdarzeń</h2>
+      <ul id="log-list"></ul>
+    </section>
+  </main>
+
+  <script src="js/common.js"></script>
+  <script src="js/index.js"></script>
+</body>
+</html>

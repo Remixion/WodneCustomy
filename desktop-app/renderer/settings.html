@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <title>WodneCustomy - Ustawienia</title>
+</head>
+<body>
+  <header>
+    <h1>WodneCustomy</h1>
+    <nav>
+      <ul>
+        <li><a href="index.html">Mecze</a></li>
+        <li><a href="players.html">Gracze</a></li>
+        <li><a href="settings.html">Ustawienia</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <section id="settings-section">
+      <h2>Ustawienia</h2>
+      <form id="settings-form">
+        <fieldset>
+          <legend>Google Apps Script</legend>
+          <p>
+            <label for="appsScriptUrl">Adres URL wdrożonej aplikacji internetowej (.../exec)</label><br />
+            <input type="text" id="appsScriptUrl" name="appsScriptUrl" size="80" />
+          </p>
+          <p>
+            <label for="sharedSecret">Sekret (SHARED_SECRET ustawiony w Apps Script)</label><br />
+            <input type="text" id="sharedSecret" name="sharedSecret" size="60" />
+          </p>
+          <p>
+            <label for="autoSync">
+              <input type="checkbox" id="autoSync" name="autoSync" />
+              Automatycznie wysyłaj dane do Google Sheets zaraz po zakończeniu gry
+            </label>
+          </p>
+          <p><button type="button" id="test-connection-btn">Testuj połączenie</button> <span id="test-connection-result"></span></p>
+        </fieldset>
+
+        <fieldset>
+          <legend>Lokalizacja danych i klienta League</legend>
+          <p>
+            <label for="dataDir">Folder zapisu danych lokalnych (JSON)</label><br />
+            <input type="text" id="dataDir" name="dataDir" size="80" />
+          </p>
+          <p>
+            <label for="customLockfilePath">Własna ścieżka do pliku lockfile klienta League (opcjonalnie)</label><br />
+            <input type="text" id="customLockfilePath" name="customLockfilePath" size="80" placeholder="np. D:/Riot Games/League of Legends/lockfile" />
+          </p>
+        </fieldset>
+
+        <p><button type="submit">Zapisz ustawienia</button></p>
+      </form>
+    </section>
+
+    <section id="log-section">
+      <h2>Dziennik zdarzeń</h2>
+      <ul id="log-list"></ul>
+    </section>
+  </main>
+
+  <script src="js/common.js"></script>
+  <script src="js/settings.js"></script>
+</body>
+</html>

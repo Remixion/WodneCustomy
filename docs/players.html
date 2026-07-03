@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WodneCustomy - Gracze</title>
+</head>
+<body>
+  <header>
+    <h1>WodneCustomy</h1>
+    <nav>
+      <ul>
+        <li><a href="index.html">Mecze</a></li>
+        <li><a href="players.html">Gracze</a></li>
+        <li><a href="settings.html">Ustawienia</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <section id="status-section">
+      <p id="status-message">Wczytywanie...</p>
+    </section>
+
+    <section id="players-section">
+      <h2>Profile graczy</h2>
+      <p><button id="refresh-btn" type="button">Odśwież</button></p>
+      <table id="players-table" border="1">
+        <thead></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <section id="log-section">
+      <h2>Dziennik zdarzeń</h2>
+      <ul id="log-list"></ul>
+    </section>
+  </main>
+
+  <script src="js/common.js"></script>
+  <script src="js/players.js"></script>
+</body>
+</html>

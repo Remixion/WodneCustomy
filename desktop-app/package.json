@@ -1,0 +1,28 @@
+{
+  "name": "wodnecustomy-desktop",
+  "version": "1.0.0",
+  "description": "Lokalna apka do zbierania danych z customowych gier 5v5 League of Legends (LCU) i synchronizacji z Google Sheets.",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.wodnecustomy.desktop",
+    "productName": "WodneCustomy",
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "renderer/**/*"
+    ],
+    "win": { "target": "nsis" },
+    "mac": { "target": "dmg" },
+    "linux": { "target": "AppImage" }
+  }
+}

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WodneCustomy - Mecze</title>
+</head>
+<body>
+  <header>
+    <h1>WodneCustomy</h1>
+    <p>Statystyki customowych gier 5 vs 5 League of Legends</p>
+    <nav>
+      <ul>
+        <li><a href="index.html">Mecze</a></li>
+        <li><a href="players.html">Gracze</a></li>
+        <li><a href="settings.html">Ustawienia</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <section id="status-section">
+      <p id="status-message">Wczytywanie danych z Google Sheets...</p>
+    </section>
+
+    <section id="matches-section">
+      <h2>Zarejestrowane mecze</h2>
+      <p><button id="refresh-btn" type="button">Odśwież</button></p>
+      <table id="matches-table" border="1">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Tryb</th>
+            <th>Mapa</th>
+            <th>Kolejka</th>
+            <th>Czas trwania</th>
+            <th>Zwycięska drużyna</th>
+            <th>Bany (niebiescy)</th>
+            <th>Bany (czerwoni)</th>
+            <th>Notatki</th>
+            <th>Akcje</th>
+          </tr>
+        </thead>
+        <tbody id="matches-tbody">
+          <tr><td colspan="10">Wczytywanie...</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="log-section">
+      <h2>Dziennik zdarzeń</h2>
+      <ul id="log-list"></ul>
+    </section>
+  </main>
+
+  <footer>
+    <p>Dane pochodzą z Arkusza Google skonfigurowanego w zakładce Ustawienia.</p>
+  </footer>
+
+  <script src="js/common.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
