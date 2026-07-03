@@ -8,8 +8,14 @@ const { URL } = require('url');
  * GitHub Pages) - Apps Script Web App nie obsługuje CORS-preflight (OPTIONS),
  * a text/plain jest "prostym" żądaniem, które go unika. Node nie podlega CORS,
  * ale zachowujemy spójność formatu z frontendem.
- * Adresy /exec Apps Script odpowiadają przekierowaniem 302 do googleusercontent.com
- * z faktyczną treścią - trzeba je ręcznie podążyć, Node tego nie robi automatycznie.
+ * Adresy /exec Apps Script odpowiadają przekierowaniem 301/302 do statycznego
+ * endpointu script.googleusercontent.com/macros/echo z faktyczną treścią -
+ * Node tego nie robi automatycznie, trzeba podążyć ręcznie. WAŻNE: ten
+ * endpoint "echo" obsługuje wyłącznie GET - jeśli oryginalne żądanie było
+ * POST-em, przekierowanie trzeba wysłać jako GET bez ciała (dokładnie tak,
+ * jak robią to przeglądarki po 301/302/303 dla POST-a). Wysłanie tam
+ * ponownie POST-a z ciałem kończy się błędem 405 i przeglądarkową stroną
+ * błędu zamiast odpowiedzi JSON.
  */
 
 function requestJson(targetUrl, options, body, redirectsLeft = 5) {
@@ -24,9 +30,10 @@ function requestJson(targetUrl, options, body, redirectsLeft = 5) {
       headers: options.headers,
     };
     const req = lib.request(reqOptions, (res) => {
-      if ((res.statusCode === 302 || res.statusCode === 301) && res.headers.location && redirectsLeft > 0) {
+      if ((res.statusCode === 302 || res.statusCode === 301 || res.statusCode === 303) && res.headers.location && redirectsLeft > 0) {
         res.resume();
-        requestJson(res.headers.location, options, body, redirectsLeft - 1).then(resolve, reject);
+        const followOptions = { method: 'GET', headers: {} };
+        requestJson(res.headers.location, followOptions, null, redirectsLeft - 1).then(resolve, reject);
         return;
       }
       let raw = '';

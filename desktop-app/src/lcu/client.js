@@ -1,10 +1,13 @@
 const https = require('https');
 
+const DEFAULT_TIMEOUT_MS = 10000;
+
 /** Klient HTTPS do lokalnego LCU API (certyfikat self-signed, autoryzacja Basic riot:<password>). */
 class LcuClient {
-  constructor({ port, password, protocol = 'https' }) {
+  constructor({ port, password, protocol = 'https' }, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
     this.port = port;
     this.protocol = protocol;
+    this.timeoutMs = timeoutMs;
     this.authHeader = 'Basic ' + Buffer.from('riot:' + password).toString('base64');
   }
 
@@ -41,6 +44,11 @@ class LcuClient {
             resolve(raw);
           }
         });
+      });
+      // Bez limitu czasu pojedyncze zawieszone żądanie (np. do niedostępnego
+      // gracza w starym meczu) blokowałoby całą operację w nieskończoność.
+      req.setTimeout(this.timeoutMs, () => {
+        req.destroy(new Error(`LCU ${method} ${urlPath} -> przekroczono limit czasu (${this.timeoutMs} ms)`));
       });
       req.on('error', reject);
       if (data) req.write(data);

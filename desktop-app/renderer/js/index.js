@@ -87,7 +87,13 @@ document.getElementById('push-all-btn').addEventListener('click', async () => {
 async function loadHistoryList() {
   const tbody = document.getElementById('history-tbody');
   tbody.innerHTML = '<tr><td colspan="5">Wczytywanie historii z klienta...</td></tr>';
-  const result = await window.api.history.listRecentMatches(20);
+  let result;
+  try {
+    result = await window.api.history.listRecentMatches(20);
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5">Błąd: ${err.message}</td></tr>`;
+    return;
+  }
   if (!result.ok) {
     tbody.innerHTML = `<tr><td colspan="5">Błąd: ${result.error}</td></tr>`;
     return;
@@ -109,14 +115,18 @@ async function loadHistoryList() {
       importBtn.addEventListener('click', async () => {
         importBtn.disabled = true;
         importBtn.textContent = 'Importowanie...';
-        const importResult = await window.api.history.importMatch(m.gameId);
-        logEvent(`Import meczu ${m.gameId}: ${importResult.ok ? 'OK' : 'błąd - ' + importResult.error}`);
-        if (importResult.ok) {
-          loadMatches();
-          loadHistoryList();
-        } else {
+        try {
+          const importResult = await window.api.history.importMatch(m.gameId);
+          logEvent(`Import meczu ${m.gameId}: ${importResult.ok ? 'OK' : 'błąd - ' + importResult.error}`);
+          if (importResult.ok) {
+            loadHistoryList();
+          }
+        } catch (err) {
+          logEvent(`Import meczu ${m.gameId}: błąd - ${err.message}`);
+        } finally {
           importBtn.disabled = false;
           importBtn.textContent = 'Importuj';
+          loadMatches();
         }
       });
       actionsTd.appendChild(importBtn);
@@ -137,22 +147,31 @@ document.getElementById('history-list-btn').addEventListener('click', loadHistor
 
 document.getElementById('rofl-pick-btn').addEventListener('click', async () => {
   const resultEl = document.getElementById('rofl-import-result');
+  const pickBtn = document.getElementById('rofl-pick-btn');
   const filePaths = await window.api.rofl.pickFiles();
   if (!filePaths.length) return;
-  resultEl.textContent = `Importowanie ${filePaths.length} plik(ów)...`;
-  const results = await window.api.rofl.import(filePaths);
-  const okFull = results.filter((r) => r.ok && r.full).length;
-  const okPartial = results.filter((r) => r.ok && !r.full).length;
-  const failed = results.filter((r) => !r.ok).length;
-  resultEl.textContent = `Zaimportowano: ${okFull} z pełnymi danymi, ${okPartial} tylko podstawowo, błędów: ${failed}`;
-  results.forEach((r) => {
-    logEvent(
-      r.ok
-        ? `Import .rofl (${r.matchId}): ${r.full ? 'pełne dane' : 'tylko podstawowy wpis'}`
-        : `Import .rofl błąd (${r.filePath}): ${r.error}`
-    );
-  });
-  loadMatches();
+  pickBtn.disabled = true;
+  resultEl.textContent = `Importowanie ${filePaths.length} plik(ów) - może to potrwać dłużej dla starszych meczów...`;
+  try {
+    const results = await window.api.rofl.import(filePaths);
+    const okFull = results.filter((r) => r.ok && r.full).length;
+    const okPartial = results.filter((r) => r.ok && !r.full).length;
+    const failed = results.filter((r) => !r.ok).length;
+    resultEl.textContent = `Zaimportowano: ${okFull} z pełnymi danymi, ${okPartial} tylko podstawowo, błędów: ${failed}`;
+    results.forEach((r) => {
+      logEvent(
+        r.ok
+          ? `Import .rofl (${r.matchId}): ${r.full ? 'pełne dane' : 'tylko podstawowy wpis'}`
+          : `Import .rofl błąd (${r.filePath}): ${r.error}`
+      );
+    });
+  } catch (err) {
+    resultEl.textContent = `Błąd importu: ${err.message}`;
+    logEvent(`Import .rofl błąd: ${err.message}`);
+  } finally {
+    pickBtn.disabled = false;
+    loadMatches();
+  }
 });
 
 window.api.lcu.onStatus(applyLcuStatus);
