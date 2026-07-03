@@ -35,7 +35,8 @@ var MATCH_PLAYERS_HEADERS = [
 ];
 
 var PLAYERS_HEADERS = [
-  'puuid', 'nick', 'color', 'avatarSource', 'discordUserId', 'discordAvatarHash', 'discordAvatarUrl',
+  'puuid', 'nick', 'color', 'avatarSource', 'discordNick',
+  'discordUserId', 'discordAvatarHash', 'discordAvatarUrl',
   'summonerName', 'summonerId', 'accountId', 'profileIconId', 'summonerLevel',
   'soloTier', 'soloRank', 'soloLP', 'soloWins', 'soloLosses', 'soloWinRatePct',
   'flexTier', 'flexRank', 'flexLP', 'flexWins', 'flexLosses', 'flexWinRatePct',
@@ -46,7 +47,7 @@ var PLAYERS_HEADERS = [
 ];
 
 /** Kolumny, których automatyczna synchronizacja NIGDY nie nadpisuje (ręcznie edytowane). */
-var PROTECTED_ON_SYNC = ['notes', 'nick', 'color', 'avatarSource'];
+var PROTECTED_ON_SYNC = ['notes', 'nick', 'color', 'avatarSource', 'discordNick'];
 
 function getSpreadsheet_() {
   return SpreadsheetApp.getActiveSpreadsheet();

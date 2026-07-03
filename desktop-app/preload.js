@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld('api', {
   },
   discord: {
     connect: () => ipcRenderer.invoke('discord:connect'),
+    syncGuildAvatars: () => ipcRenderer.invoke('discord:sync-guild-avatars'),
   },
   collector: {
     onStatus: (cb) => ipcRenderer.on('collector:status', (_evt, data) => cb(data)),

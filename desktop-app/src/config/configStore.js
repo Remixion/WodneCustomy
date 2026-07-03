@@ -12,6 +12,8 @@ class ConfigStore {
       customLockfilePath: '',
       autoSync: true,
       discordClientId: '',
+      discordBotToken: '',
+      discordGuildId: '',
     };
     this.data = this.load();
   }

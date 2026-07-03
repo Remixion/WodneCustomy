@@ -6,6 +6,8 @@ async function load() {
   document.getElementById('dataDir').value = cfg.dataDir || '';
   document.getElementById('customLockfilePath').value = cfg.customLockfilePath || '';
   document.getElementById('discordClientId').value = cfg.discordClientId || '';
+  document.getElementById('discordBotToken').value = cfg.discordBotToken || '';
+  document.getElementById('discordGuildId').value = cfg.discordGuildId || '';
 }
 
 document.getElementById('settings-form').addEventListener('submit', async (evt) => {
@@ -17,9 +19,24 @@ document.getElementById('settings-form').addEventListener('submit', async (evt) 
     dataDir: document.getElementById('dataDir').value.trim(),
     customLockfilePath: document.getElementById('customLockfilePath').value.trim(),
     discordClientId: document.getElementById('discordClientId').value.trim(),
+    discordBotToken: document.getElementById('discordBotToken').value.trim(),
+    discordGuildId: document.getElementById('discordGuildId').value.trim(),
   };
   await window.api.config.set(partial);
   logEvent('Zapisano ustawienia');
+});
+
+document.getElementById('discord-bot-sync-btn').addEventListener('click', async () => {
+  const resultEl = document.getElementById('discord-bot-sync-result');
+  resultEl.textContent = 'Pobieranie członków serwera i dopasowywanie graczy...';
+  const result = await window.api.discord.syncGuildAvatars();
+  if (result.ok) {
+    resultEl.textContent = `Znaleziono ${result.membersFound} członków serwera, dopasowano ${result.matchedCount} graczy.` +
+      (result.unmatched.length ? ` Bez dopasowania: ${result.unmatched.join(', ')}` : '');
+  } else {
+    resultEl.textContent = `Błąd: ${result.error}`;
+  }
+  logEvent(`Discord (bot): ${result.ok ? `dopasowano ${result.matchedCount}/${result.membersFound} zapisanych graczy` : 'błąd - ' + result.error}`);
 });
 
 document.getElementById('discord-connect-btn').addEventListener('click', async () => {

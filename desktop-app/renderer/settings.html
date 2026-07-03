@@ -59,6 +59,29 @@
         </fieldset>
 
         <fieldset>
+          <legend>Discord - bot serwera (opcjonalnie, awatary dla wszystkich naraz)</legend>
+          <p>
+            <label for="discordBotToken">Token bota Discord</label><br />
+            <input type="password" id="discordBotToken" name="discordBotToken" size="60" />
+          </p>
+          <p>
+            <label for="discordGuildId">ID serwera Discord (Guild ID)</label><br />
+            <input type="text" id="discordGuildId" name="discordGuildId" size="40" />
+          </p>
+          <p>
+            Wymaga dodania bota do serwera i wypełnienia pola <b>discordNick</b>
+            (nazwa użytkownika lub nick na serwerze) w zakładce Gracze dla
+            każdego gracza, którego avatar ma zostać dopasowany. Nie wymaga
+            uruchomionego Discorda ani League u pozostałych graczy - działa
+            z jednego komputera dla całej drużyny naraz.
+          </p>
+          <p>
+            <button type="button" id="discord-bot-sync-btn">Pobierz avatary wszystkich graczy (bot)</button>
+            <span id="discord-bot-sync-result"></span>
+          </p>
+        </fieldset>
+
+        <fieldset>
           <legend>Lokalizacja danych i klienta League</legend>
           <p>
             <label for="dataDir">Folder zapisu danych lokalnych (JSON)</label><br />

@@ -116,14 +116,16 @@ Dane trafiają do trzech podarkuszy w Arkuszu Google:
   samym co nazwa w League of Legends), **color** (opcjonalny własny kolor
   hex nicku - jeśli pusty, kolor jest przydzielany automatycznie z palety na
   podstawie `puuid`), **avatarSource** (`lol` albo `discord` - wybór
-  domyślnego źródła awatara), **discordUserId** / **discordAvatarHash** /
-  **discordAvatarUrl** (dane avataru z Discorda, patrz sekcja "Drugie źródło
-  awatarów" niżej), nazwa przywoływacza, poziom konta, ranga solo/flex
-  (tier, dywizja, LP, bilans W/L), TOP 3 najbardziej opanowanych bohaterów
-  wraz z punktami mistrzostwa, łączny wynik mistrzostwa, notatki.
+  domyślnego źródła awatara), **discordNick** (nazwa użytkownika/nick na
+  Discordzie, używana przez bota do dopasowania gracza), **discordUserId** /
+  **discordAvatarHash** / **discordAvatarUrl** (dane avataru z Discorda,
+  patrz sekcja "Drugie źródło awatarów" niżej), nazwa przywoływacza, poziom
+  konta, ranga solo/flex (tier, dywizja, LP, bilans W/L), TOP 3 najbardziej
+  opanowanych bohaterów wraz z punktami mistrzostwa, łączny wynik
+  mistrzostwa, notatki.
 
-Ręcznie wpisane pola (`notes`, `nick`, `color`, `avatarSource`) nigdy nie są
-nadpisywane przez automatyczną synchronizację danych z gry.
+Ręcznie wpisane pola (`notes`, `nick`, `color`, `avatarSource`, `discordNick`)
+nigdy nie są nadpisywane przez automatyczną synchronizację danych z gry.
 
 ## Zakładka Statystyki
 
@@ -162,8 +164,10 @@ kolorowym nickiem) i zobaczyć jego pełny profil:
 
 ### Drugie źródło awatarów - Discord
 
-Apka desktopowa potrafi pobrać avatar z **lokalnie uruchomionego klienta
-Discord** jako alternatywę dla ikony profilu z League of Legends:
+Apka desktopowa potrafi pobrać avatary z Discorda jako alternatywę dla ikony
+profilu z League of Legends, na dwa sposoby.
+
+#### Sposób A: każdy gracz samodzielnie (bez bota)
 
 1. Załóż darmową aplikację na [discord.com/developers/applications](https://discord.com/developers/applications)
    ("New Application", dowolna nazwa) - nie trzeba dodawać bota ani niczego
@@ -180,16 +184,49 @@ Discord** jako alternatywę dla ikony profilu z League of Legends:
    `puuid` aktualnie zalogowanego konta) i zsynchronizuje z Arkuszem.
 5. Każdy gracz w drużynie powtarza ten krok na swoim komputerze, żeby jego
    avatar Discorda pojawił się w danych współdzielonych przez wszystkich.
-6. W zakładce **Gracze** wybierz w polu **avatarSource** wartość `Discord`
-   dla graczy, u których avatar Discorda ma mieć pierwszeństwo przed ikoną
-   profilu z League (domyślnie brany jest avatar z League of Legends).
 
-Ta funkcja działa wyłącznie w apce desktopowej (wymaga lokalnego dostępu do
-klienta Discord przez IPC, niedostępnego z poziomu przeglądarki). Na stronie
-GitHub Pages oraz w apce desktopowej można też **ręcznie** wkleić dowolny
-link do obrazka w polu **discordAvatarUrl** w zakładce Gracze - to działa
-bez połączenia z Discordem, np. gdy ktoś nie chce uruchamiać apki
-desktopowej.
+#### Sposób B: bot serwera (jedna osoba pobiera awatary dla wszystkich)
+
+Jeśli macie wspólny serwer Discord, jedna osoba może pobrać awatary całej
+drużyny naraz, bez potrzeby uruchamiania czegokolwiek przez pozostałych
+graczy:
+
+1. W tej samej aplikacji na [discord.com/developers/applications](https://discord.com/developers/applications)
+   (tej samej co w Sposobie A lub nowej) wejdź w zakładkę **Bot** -> **Add Bot**.
+2. Tam samo w zakładce **Bot** kliknij **Reset Token** / **Copy** i skopiuj
+   **token bota** (traktuj go jak hasło - daje pełną kontrolę nad botem).
+3. W tej samej zakładce włącz przełącznik **Server Members Intent**
+   (sekcja "Privileged Gateway Intents") i zapisz zmiany - bez tego bot nie
+   odczyta listy członków serwera.
+4. Wejdź w zakładkę **OAuth2 -> URL Generator**, zaznacz scope **bot** (nie
+   trzeba zaznaczać żadnych uprawnień), skopiuj wygenerowany link, otwórz go
+   w przeglądarce i dodaj bota do swojego serwera.
+5. Włącz w Discordzie **Tryb dewelopera** (Ustawienia -> Zaawansowane),
+   kliknij prawym na ikonę swojego serwera -> **Kopiuj ID serwera** (to Twój
+   Guild ID).
+6. W apce desktopowej, w zakładce **Ustawienia**, wklej token bota oraz ID
+   serwera i zapisz.
+7. W zakładce **Gracze** wypełnij pole **discordNick** dla każdego gracza -
+   jego nazwę użytkownika Discord albo nick na serwerze.
+8. Kliknij **Pobierz avatary wszystkich graczy (bot)** - aplikacja pobierze
+   listę członków serwera, dopasuje ich do graczy po `discordNick` i zapisze
+   znalezione awatary (lokalnie i w Arkuszu) dla wszystkich naraz.
+
+Niedopasowani gracze (literówka w `discordNick`, brak na serwerze) zostaną
+wypisani w wyniku, żeby łatwo poprawić dane i spróbować ponownie.
+
+#### Wspólne dla obu sposobów
+
+W zakładce **Gracze** wybierz w polu **avatarSource** wartość `Discord` dla
+graczy, u których avatar Discorda ma mieć pierwszeństwo przed ikoną profilu z
+League (domyślnie brany jest avatar z League of Legends).
+
+Obie funkcje działają wyłącznie w apce desktopowej (wymagają lokalnego
+dostępu do Discorda przez IPC albo tokena bota, niedostępnych z poziomu
+przeglądarki). Na stronie GitHub Pages oraz w apce desktopowej można też
+**ręcznie** wkleić dowolny link do obrazka w polu **discordAvatarUrl** w
+zakładce Gracze - to działa bez Discorda w ogóle, np. gdy ktoś nie chce
+uruchamiać apki desktopowej ani zakładać bota.
 
 ### Kolor gracza
 
@@ -218,5 +255,9 @@ zgodnie z założeniem czystego HTML w tym projekcie.
   chroniony wyłącznie sekretem (`SHARED_SECRET`) wpisanym w ustawieniach -
   każdy, kto pozna URL Apps Script i sekret, może edytować dane. Traktuj
   sekret jak hasło i nie publikuj go.
+- **Token bota Discord daje pełną kontrolę nad botem** - traktuj go jak
+  hasło: nie publikuj go, nie commituj, nie wysyłaj nikomu. Jest zapisywany
+  wyłącznie lokalnie w konfiguracji apki desktopowej i nigdy nie jest
+  synchronizowany do Arkusza ani nigdzie indziej.
 - Strona i aplikacja nie używają żadnego CSS - wygląd celowo ogranicza się do
   czystej, semantycznej struktury HTML (tabele, listy definicji, formularze).

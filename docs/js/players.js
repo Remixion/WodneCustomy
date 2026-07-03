@@ -1,5 +1,5 @@
 const PLAYER_FIELDS = [
-  'nick', 'color', 'avatarSource', 'discordAvatarUrl',
+  'nick', 'color', 'avatarSource', 'discordNick', 'discordAvatarUrl',
   'summonerName', 'summonerId', 'accountId', 'profileIconId', 'summonerLevel',
   'soloTier', 'soloRank', 'soloLP', 'soloWins', 'soloLosses', 'soloWinRatePct',
   'flexTier', 'flexRank', 'flexLP', 'flexWins', 'flexLosses', 'flexWinRatePct',
@@ -87,6 +87,7 @@ async function renderPlayers(players) {
         input.value = player[field] != null ? player[field] : '';
         input.size = field === 'summonerName' || field === 'nick' ? 20 : 8;
         if (field === 'color') input.placeholder = '#rrggbb (puste = kolor domyślny z palety)';
+        if (field === 'discordNick') input.placeholder = 'nazwa użytkownika lub nick na serwerze Discord';
         if (field === 'discordAvatarUrl') input.placeholder = 'link do avatara Discord (ręcznie lub z apki desktopowej)';
       }
       input.addEventListener('change', async () => {

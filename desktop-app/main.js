@@ -7,6 +7,7 @@ const { LocalStore } = require('./src/storage/localStore');
 const { ConfigStore } = require('./src/config/configStore');
 const { postToAppsScript, getFromAppsScript } = require('./src/sync/sheetsClient');
 const { connectDiscordRpc, buildDiscordAvatarUrl } = require('./src/discord/discordRpc');
+const { fetchAllGuildMembers, buildDiscordMemberLookup } = require('./src/discord/discordBot');
 const { getCurrentSummonerPuuid } = require('./src/lcu/currentSummoner');
 const { findLeagueClient } = require('./src/lcu/lockfile');
 const { LcuClient } = require('./src/lcu/client');
@@ -198,4 +199,56 @@ ipcMain.handle('discord:connect', async () => {
   }
 
   return { ok: true, puuid, discordUser, avatarUrl, syncResult };
+});
+
+// ---- IPC: masowe pobranie awatarów dla wszystkich graczy z serwera Discord (przez bota) ----
+ipcMain.handle('discord:sync-guild-avatars', async () => {
+  const cfg = configStore.getAll();
+  if (!cfg.discordBotToken || !cfg.discordGuildId) {
+    return { ok: false, error: 'Brak skonfigurowanego tokena bota lub ID serwera Discord (zakładka Ustawienia).' };
+  }
+
+  let members;
+  try {
+    members = await fetchAllGuildMembers(cfg.discordBotToken, cfg.discordGuildId);
+  } catch (err) {
+    return { ok: false, error: `Nie udało się pobrać listy członków serwera: ${err.message}` };
+  }
+
+  const lookup = buildDiscordMemberLookup(cfg.discordGuildId, members, buildDiscordAvatarUrl);
+
+  // Preferuj graczy z Arkusza (współdzielone źródło prawdy), z fallbackiem na dane lokalne.
+  let players = store.listPlayers();
+  if (cfg.appsScriptUrl) {
+    try {
+      const remote = await getFromAppsScript(cfg.appsScriptUrl);
+      if (remote.ok && remote.data && remote.data.players) players = remote.data.players;
+    } catch (err) {
+      // brak połączenia z arkuszem - pracuj na danych lokalnych
+    }
+  }
+
+  const matched = [];
+  const unmatched = [];
+  players.forEach((player) => {
+    const key = (player.discordNick || '').trim().toLowerCase();
+    if (!key) return;
+    const found = lookup[key];
+    if (found) {
+      matched.push({ puuid: player.puuid, ...found });
+    } else {
+      unmatched.push(player.discordNick);
+    }
+  });
+
+  if (matched.length) {
+    store.upsertPlayers(matched);
+  }
+
+  let syncResult = null;
+  if (matched.length && cfg.appsScriptUrl) {
+    syncResult = await postToAppsScript(cfg.appsScriptUrl, cfg.sharedSecret, 'syncPlayers', { players: matched });
+  }
+
+  return { ok: true, membersFound: members.length, matchedCount: matched.length, unmatched, syncResult };
 });
