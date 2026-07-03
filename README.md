@@ -79,6 +79,30 @@ Po rozegraniu customowej gry 5 vs 5 dane zostaną automatycznie pobrane,
 zapisane lokalnie w `desktop-app` (w katalogu danych aplikacji) oraz wysłane
 do Arkusza Google (jeśli włączona jest automatyczna synchronizacja).
 
+### Import meczów rozegranych pod nieobecność apki
+
+Jeśli apka nie była uruchomiona w chwili zakończenia gry (np. nie było Cię
+wtedy przy komputerze), zakładka **Mecze** oferuje dwa sposoby na
+doimportowanie takiego meczu:
+
+1. **Import z historii klienta League** (zalecane, pełne dane) - przycisk
+   "Wczytaj ostatnie mecze z klienta" pokazuje listę Twoich ostatnich gier
+   zapisanych lokalnie przez sam klient League (dotyczy też meczów sprzed
+   wielu miesięcy) - wystarczy kliknąć "Importuj" przy wybranym meczu, żeby
+   pobrać dokładnie te same, pełne dane co przy automatycznym
+   przechwytywaniu. Wymaga uruchomionego i zalogowanego klienta League.
+2. **Import z pliku .rofl** - przycisk "Wybierz plik(i) .rofl" pozwala
+   wskazać zapisane repliki z folderu `Replays` klienta League. Uwaga: sam
+   plik `.rofl` **od patcha 13.20 nie zawiera już szczegółowych statystyk
+   graczy** - to potwierdzony, zgłoszony i nigdy niezałatany błąd po stronie
+   Riota ([RiotGames/developer-relations#831](https://github.com/RiotGames/developer-relations/issues/831)).
+   Dlatego import korzysta z identyfikatora gry zawartego w nazwie pliku
+   (np. `EUN1-3880767863.rofl`) i pobiera pełne dane tym samym sposobem co
+   punkt 1 powyżej - o ile klient League jest uruchomiony i ma dostęp do
+   historii tej gry. Jeśli się nie uda, zapisany zostanie tylko podstawowy,
+   pusty wpis (identyfikator gry) do ręcznego uzupełnienia albo ponownej
+   próby przez import z historii klienta.
+
 ### Budowanie pliku instalacyjnego (.exe / .dmg / .AppImage)
 
 ```bash

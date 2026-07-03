@@ -10,26 +10,27 @@ function computeKda(k, d, a) {
 }
 
 /**
- * Odczytuje dane właśnie zakończonej gry z LCU (faza EndOfGame) i buduje
- * znormalizowany rekord meczu + listę graczy (na bazie /lol-match-history/v1/games/{gameId},
- * czyli tego samego kształtu danych co publiczne Riot Match API - stabilniejszego
- * niż nieoficjalny /lol-end-of-game/v1/eog-stats-block, który dołączamy dodatkowo
- * jako surowy JSON w polu rawDataJson).
+ * Buduje znormalizowany rekord meczu + listę graczy na bazie
+ * /lol-match-history/v1/games/{gameId} (ten sam kształt danych co publiczne
+ * Riot Match API). Współdzielone przez: automatyczne przechwytywanie po
+ * zakończeniu gry (collectMatch) oraz ręczny import z historii meczów klienta
+ * (import starszych meczów, w których apka nie była uruchomiona).
+ *
+ * eogStatsBlock (/lol-end-of-game/v1/eog-stats-block) to niedokumentowane,
+ * przejściowe dane z ekranu końca gry - mają sens tylko tuż po zakończeniu
+ * aktualnie rozgrywanej gry, dlatego dołączamy je wyłącznie w collectMatch,
+ * nigdy przy imporcie historycznego meczu.
  */
-async function collectMatch(client) {
-  const session = await client.get('/lol-gameflow/v1/session').catch(() => null);
-  const gameId = session && session.gameData && session.gameData.gameId;
-  if (!gameId) {
-    throw new Error('Nie udało się odczytać gameId zakończonej gry z sesji gameflow.');
-  }
-
+async function buildMatchFromGameId(client, gameId, { includeEogStatsBlock = false } = {}) {
   const matchHistory = await client.get(`/lol-match-history/v1/games/${gameId}`);
 
   let eogStatsBlock = null;
-  try {
-    eogStatsBlock = await client.get('/lol-end-of-game/v1/eog-stats-block');
-  } catch (err) {
-    eogStatsBlock = null; // opcjonalne, niedokumentowane API - brak nie blokuje zapisu meczu
+  if (includeEogStatsBlock) {
+    try {
+      eogStatsBlock = await client.get('/lol-end-of-game/v1/eog-stats-block');
+    } catch (err) {
+      eogStatsBlock = null; // opcjonalne, niedokumentowane API - brak nie blokuje zapisu meczu
+    }
   }
 
   const champMap = await getChampionMap(client);
@@ -143,4 +144,18 @@ async function collectMatch(client) {
   return { match, players };
 }
 
-module.exports = { collectMatch };
+/**
+ * Odczytuje dane właśnie zakończonej gry z LCU (faza EndOfGame): pobiera
+ * gameId z aktywnej sesji gameflow i buduje mecz + graczy przez
+ * buildMatchFromGameId, dołączając dodatkowo surowy eog-stats-block.
+ */
+async function collectMatch(client) {
+  const session = await client.get('/lol-gameflow/v1/session').catch(() => null);
+  const gameId = session && session.gameData && session.gameData.gameId;
+  if (!gameId) {
+    throw new Error('Nie udało się odczytać gameId zakończonej gry z sesji gameflow.');
+  }
+  return buildMatchFromGameId(client, gameId, { includeEogStatsBlock: true });
+}
+
+module.exports = { collectMatch, buildMatchFromGameId };

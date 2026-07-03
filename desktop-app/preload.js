@@ -29,6 +29,14 @@ contextBridge.exposeInMainWorld('api', {
     connect: () => ipcRenderer.invoke('discord:connect'),
     syncGuildAvatars: () => ipcRenderer.invoke('discord:sync-guild-avatars'),
   },
+  history: {
+    listRecentMatches: (count) => ipcRenderer.invoke('history:list-recent-matches', count),
+    importMatch: (gameId) => ipcRenderer.invoke('history:import-match', gameId),
+  },
+  rofl: {
+    pickFiles: () => ipcRenderer.invoke('rofl:pick-files'),
+    import: (filePaths) => ipcRenderer.invoke('rofl:import', filePaths),
+  },
   collector: {
     onStatus: (cb) => ipcRenderer.on('collector:status', (_evt, data) => cb(data)),
     onMatchSaved: (cb) => ipcRenderer.on('collector:match-saved', (_evt, data) => cb(data)),

@@ -57,6 +57,45 @@
       </table>
     </section>
 
+    <section id="history-import-section">
+      <h2>Import z historii klienta League</h2>
+      <p>
+        Pozwala doimportować mecze, w których apka nie była uruchomiona
+        w chwili zakończenia gry (np. gdy Cię przy tym nie było) - z pełnymi
+        statystykami, tak jak przy zwykłym automatycznym przechwytywaniu.
+        Wymaga uruchomionego i zalogowanego klienta League of Legends.
+      </p>
+      <p><button id="history-list-btn" type="button">Wczytaj ostatnie mecze z klienta</button></p>
+      <table id="history-table" border="1">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Tryb</th>
+            <th>Mapa</th>
+            <th>Czas trwania</th>
+            <th>Akcje</th>
+          </tr>
+        </thead>
+        <tbody id="history-tbody"></tbody>
+      </table>
+    </section>
+
+    <section id="rofl-import-section">
+      <h2>Import z pliku .rofl</h2>
+      <p>
+        Uwaga: sam plik .rofl od patcha 13.20 nie zawiera już szczegółowych
+        statystyk (to znany, niezałatany problem po stronie Riota). Import
+        korzysta z identyfikatora gry zawartego w nazwie pliku i pobiera
+        pełne dane przez klienta League (tak jak wyżej) - jeśli to się nie
+        uda (np. inne konto zalogowane), zapisany zostanie tylko podstawowy,
+        pusty wpis do uzupełnienia ręcznie.
+      </p>
+      <p>
+        <button id="rofl-pick-btn" type="button">Wybierz plik(i) .rofl</button>
+        <span id="rofl-import-result"></span>
+      </p>
+    </section>
+
     <section id="log-section">
       <h2>Dziennik zdarzeń</h2>
       <ul id="log-list"></ul>

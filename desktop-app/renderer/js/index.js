@@ -84,6 +84,77 @@ document.getElementById('push-all-btn').addEventListener('click', async () => {
   logEvent(`Zakończono wysyłkę: ${results.length - failed.length}/${results.length} OK`);
 });
 
+async function loadHistoryList() {
+  const tbody = document.getElementById('history-tbody');
+  tbody.innerHTML = '<tr><td colspan="5">Wczytywanie historii z klienta...</td></tr>';
+  const result = await window.api.history.listRecentMatches(20);
+  if (!result.ok) {
+    tbody.innerHTML = `<tr><td colspan="5">Błąd: ${result.error}</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = '';
+  if (!result.matches.length) {
+    tbody.innerHTML = '<tr><td colspan="5">Brak meczów w lokalnej historii klienta.</td></tr>';
+    return;
+  }
+  result.matches.forEach((m) => {
+    const tr = document.createElement('tr');
+    const actionsTd = document.createElement('td');
+    if (m.alreadyImported) {
+      actionsTd.textContent = 'już zaimportowany';
+    } else {
+      const importBtn = document.createElement('button');
+      importBtn.type = 'button';
+      importBtn.textContent = 'Importuj';
+      importBtn.addEventListener('click', async () => {
+        importBtn.disabled = true;
+        importBtn.textContent = 'Importowanie...';
+        const importResult = await window.api.history.importMatch(m.gameId);
+        logEvent(`Import meczu ${m.gameId}: ${importResult.ok ? 'OK' : 'błąd - ' + importResult.error}`);
+        if (importResult.ok) {
+          loadMatches();
+          loadHistoryList();
+        } else {
+          importBtn.disabled = false;
+          importBtn.textContent = 'Importuj';
+        }
+      });
+      actionsTd.appendChild(importBtn);
+    }
+
+    tr.innerHTML = `
+      <td>${formatDate(m.gameCreationDate)}</td>
+      <td>${m.gameMode || ''}</td>
+      <td>${m.mapId || ''}</td>
+      <td>${formatDuration(m.gameDurationSec)}</td>
+    `;
+    tr.appendChild(actionsTd);
+    tbody.appendChild(tr);
+  });
+}
+
+document.getElementById('history-list-btn').addEventListener('click', loadHistoryList);
+
+document.getElementById('rofl-pick-btn').addEventListener('click', async () => {
+  const resultEl = document.getElementById('rofl-import-result');
+  const filePaths = await window.api.rofl.pickFiles();
+  if (!filePaths.length) return;
+  resultEl.textContent = `Importowanie ${filePaths.length} plik(ów)...`;
+  const results = await window.api.rofl.import(filePaths);
+  const okFull = results.filter((r) => r.ok && r.full).length;
+  const okPartial = results.filter((r) => r.ok && !r.full).length;
+  const failed = results.filter((r) => !r.ok).length;
+  resultEl.textContent = `Zaimportowano: ${okFull} z pełnymi danymi, ${okPartial} tylko podstawowo, błędów: ${failed}`;
+  results.forEach((r) => {
+    logEvent(
+      r.ok
+        ? `Import .rofl (${r.matchId}): ${r.full ? 'pełne dane' : 'tylko podstawowy wpis'}`
+        : `Import .rofl błąd (${r.filePath}): ${r.error}`
+    );
+  });
+  loadMatches();
+});
+
 window.api.lcu.onStatus(applyLcuStatus);
 window.api.collector.onStatus((s) => {
   document.getElementById('collector-status').textContent = s.collecting ? 'zbieranie danych zakończonego meczu...' : 'bezczynny';

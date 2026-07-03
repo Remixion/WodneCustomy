@@ -1,7 +1,10 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { GameWatcher } = require('./src/collector/gameWatcher');
-const { collectMatch } = require('./src/collector/matchBuilder');
+const { collectMatch, buildMatchFromGameId } = require('./src/collector/matchBuilder');
+const { fetchRecentMatchSummaries } = require('./src/collector/matchHistoryList');
+const { parseGameIdFromRoflFilename } = require('./src/collector/roflParser');
 const { enrichPlayer } = require('./src/collector/playerProfile');
 const { LocalStore } = require('./src/storage/localStore');
 const { ConfigStore } = require('./src/config/configStore');
@@ -53,32 +56,46 @@ async function syncPlayersToSheets(players) {
   return postToAppsScript(cfg.appsScriptUrl, cfg.sharedSecret, 'syncPlayers', { players });
 }
 
+/**
+ * Wspólna ścieżka zapisu meczu: zapis lokalny, wzbogacenie profili graczy
+ * (best-effort) i synchronizacja z Arkuszem. Używana zarówno przez
+ * automatyczne przechwytywanie (handleEndOfGame) jak i ręczny import
+ * (z historii klienta albo z pliku .rofl).
+ */
+async function processCollectedMatch(client, { match, players }, { autoSyncOverride } = {}) {
+  store.saveMatch(match, players);
+  sendToRenderer('collector:match-saved', { match, players });
+
+  const enriched = [];
+  for (const p of players) {
+    if (!p.puuid) continue;
+    try {
+      const profile = await enrichPlayer(client, p);
+      enriched.push(profile);
+    } catch (err) {
+      // pomiń wzbogacenie tego gracza, nie przerywaj reszty
+    }
+  }
+  const merged = store.upsertPlayers(enriched);
+  sendToRenderer('collector:players-saved', { players: merged });
+
+  const cfg = configStore.getAll();
+  const shouldSync = autoSyncOverride !== undefined ? autoSyncOverride : cfg.autoSync;
+  let syncResult = null;
+  if (shouldSync && cfg.appsScriptUrl) {
+    const matchResult = await syncMatchToSheets(match.matchId);
+    const playersResult = await syncPlayersToSheets(enriched);
+    syncResult = { matchResult, playersResult };
+    sendToRenderer('collector:sync-result', syncResult);
+  }
+  return { match, players, enrichedCount: enriched.length, syncResult };
+}
+
 async function handleEndOfGame(client) {
   try {
     sendToRenderer('collector:status', { collecting: true });
     const { match, players } = await collectMatch(client);
-    store.saveMatch(match, players);
-    sendToRenderer('collector:match-saved', { match, players });
-
-    const enriched = [];
-    for (const p of players) {
-      if (!p.puuid) continue;
-      try {
-        const profile = await enrichPlayer(client, p);
-        enriched.push(profile);
-      } catch (err) {
-        // pomiń wzbogacenie tego gracza, nie przerywaj reszty
-      }
-    }
-    const merged = store.upsertPlayers(enriched);
-    sendToRenderer('collector:players-saved', { players: merged });
-
-    const cfg = configStore.getAll();
-    if (cfg.autoSync && cfg.appsScriptUrl) {
-      const matchResult = await syncMatchToSheets(match.matchId);
-      const playersResult = await syncPlayersToSheets(enriched);
-      sendToRenderer('collector:sync-result', { matchResult, playersResult });
-    }
+    await processCollectedMatch(client, { match, players });
     sendToRenderer('collector:status', { collecting: false });
   } catch (err) {
     sendToRenderer('collector:status', { collecting: false, error: String(err) });
@@ -251,4 +268,110 @@ ipcMain.handle('discord:sync-guild-avatars', async () => {
   }
 
   return { ok: true, membersFound: members.length, matchedCount: matched.length, unmatched, syncResult };
+});
+
+/** Tworzy klienta LCU do jednorazowego użycia (import), niezależnego od instancji GameWatchera. */
+function createOneOffLcuClient() {
+  const cfg = configStore.getAll();
+  const info = findLeagueClient(cfg.customLockfilePath);
+  if (!info) return null;
+  return new LcuClient(info);
+}
+
+// ---- IPC: import z lokalnej historii meczów klienta (mecze sprzed uruchomienia tej apki) ----
+ipcMain.handle('history:list-recent-matches', async (_evt, count) => {
+  try {
+    const client = createOneOffLcuClient();
+    if (!client) return { ok: false, error: 'Klient League of Legends nie jest uruchomiony.' };
+    const puuid = await getCurrentSummonerPuuid(client);
+    if (!puuid) return { ok: false, error: 'Nie udało się odczytać puuid zalogowanego gracza.' };
+    const summaries = await fetchRecentMatchSummaries(client, puuid, count || 20);
+    const existingIds = new Set(store.listMatches().map((m) => String(m.match.matchId)));
+    return { ok: true, matches: summaries.map((s) => ({ ...s, alreadyImported: existingIds.has(s.gameId) })) };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+});
+
+ipcMain.handle('history:import-match', async (_evt, gameId) => {
+  try {
+    const client = createOneOffLcuClient();
+    if (!client) return { ok: false, error: 'Klient League of Legends nie jest uruchomiony.' };
+    const { match, players } = await buildMatchFromGameId(client, gameId, { includeEogStatsBlock: false });
+    const result = await processCollectedMatch(client, { match, players });
+    return { ok: true, matchId: result.match.matchId, enrichedCount: result.enrichedCount, syncResult: result.syncResult };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+});
+
+// ---- IPC: import z plików .rofl (patrz komentarz w roflParser.js o ograniczeniach) ----
+ipcMain.handle('rofl:pick-files', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Wybierz plik(i) .rofl',
+    filters: [{ name: 'League of Legends Replay', extensions: ['rofl'] }],
+    properties: ['openFile', 'multiSelections'],
+  });
+  if (result.canceled) return [];
+  return result.filePaths;
+});
+
+ipcMain.handle('rofl:import', async (_evt, filePaths) => {
+  const results = [];
+  for (const filePath of filePaths) {
+    const gameId = parseGameIdFromRoflFilename(filePath);
+    if (!gameId) {
+      results.push({ filePath, ok: false, error: 'Nie udało się odczytać identyfikatora gry z nazwy pliku (oczekiwano np. "EUN1-1234567890.rofl").' });
+      continue;
+    }
+
+    const client = createOneOffLcuClient();
+    if (client) {
+      try {
+        const { match, players } = await buildMatchFromGameId(client, gameId, { includeEogStatsBlock: false });
+        const result = await processCollectedMatch(client, { match, players });
+        results.push({ filePath, ok: true, matchId: result.match.matchId, full: true });
+        continue;
+      } catch (err) {
+        // klient działa, ale nie ma dostępu do historii tej gry - zapisz zapasowo minimalny wpis poniżej
+      }
+    }
+
+    try {
+      const stat = fs.statSync(filePath);
+      const match = {
+        matchId: gameId,
+        gameCreationDate: stat.mtime.toISOString(),
+        gameDurationSec: '',
+        gameMode: '',
+        gameType: '',
+        mapId: '',
+        queueId: '',
+        gameVersion: '',
+        winningTeam: '',
+        blueBans: '',
+        redBans: '',
+        blueBaronKills: 0,
+        blueDragonKills: 0,
+        blueHeraldKills: 0,
+        blueTowerKills: 0,
+        blueInhibKills: 0,
+        redBaronKills: 0,
+        redDragonKills: 0,
+        redHeraldKills: 0,
+        redTowerKills: 0,
+        redInhibKills: 0,
+        notes:
+          'Import z pliku .rofl bez pełnych danych - klient League nie był uruchomiony albo nie miał dostępu ' +
+          'do historii tej gry. Spróbuj ponownie, gdy będzie zalogowane konto, które w niej grało, albo użyj ' +
+          '"Import z historii klienta" / uzupełnij dane ręcznie.',
+        rawDataJson: '',
+      };
+      store.saveMatch(match, []);
+      results.push({ filePath, ok: true, matchId: gameId, full: false });
+    } catch (err) {
+      results.push({ filePath, ok: false, error: String(err) });
+    }
+  }
+  return results;
 });
