@@ -113,12 +113,13 @@ Dane trafiają do trzech podarkuszy w Arkuszu Google:
   wynik (wygrana/przegrana), notatki.
 - **`Players`** - jeden wiersz na unikalnego gracza (po `puuid`), aktualizowany
   po każdym meczu: **nick** (ogólna, dowolna nazwa gracza - nie musi być tym
-  samym co nazwa w League of Legends), nazwa przywoływacza, poziom konta,
-  ranga solo/flex (tier, dywizja, LP, bilans W/L), TOP 3 najbardziej
-  opanowanych bohaterów wraz z punktami mistrzostwa, łączny wynik
-  mistrzostwa, notatki.
+  samym co nazwa w League of Legends), **color** (opcjonalny własny kolor
+  hex nicku - jeśli pusty, kolor jest przydzielany automatycznie z palety na
+  podstawie `puuid`), nazwa przywoływacza, poziom konta, ranga solo/flex
+  (tier, dywizja, LP, bilans W/L), TOP 3 najbardziej opanowanych bohaterów
+  wraz z punktami mistrzostwa, łączny wynik mistrzostwa, notatki.
 
-Ręcznie wpisane pola (`notes`, `nick`) nigdy nie są nadpisywane przez
+Ręcznie wpisane pola (`notes`, `nick`, `color`) nigdy nie są nadpisywane przez
 automatyczną synchronizację danych z gry.
 
 ## Zakładka Statystyki
@@ -141,6 +142,35 @@ Zarówno strona GitHub Pages, jak i apka desktopowa, mają zakładkę
 Wszędzie tam, gdzie wyświetlane jest imię gracza, pierwszeństwo ma **nick**
 (jeśli ustawiony w zakładce Gracze), w przeciwnym razie używana jest nazwa
 przywoływacza z League of Legends.
+
+## Zakładka Profile
+
+Zakładka **Profile** pozwala wybrać konkretnego gracza z listy (z awatarem i
+kolorowym nickiem) i zobaczyć jego pełny profil:
+
+- awatar pobierany z Data Dragon na podstawie `profileIconId`,
+- kolorowy nick (patrz sekcja "Kolor gracza" niżej),
+- nazwa przywoływacza, poziom konta, ranga Solo/Duo i Flex,
+- zbiorcze statystyki: liczba gier, bilans W/L, średnie KDA, ulubiony
+  champion i rola,
+- tabela ostatnich 10 rozegranych meczów tego gracza (data, champion, wynik,
+  K/D/A, KDA, CS, obrażenia) z linkiem do pełnych szczegółów meczu.
+
+### Kolor gracza
+
+Każdy gracz ma przypisany indywidualny kolor, używany wszędzie tam, gdzie
+wyświetlany jest jego nick (zakładki Profile, Statystyki, Gracze oraz widok
+szczegółów meczu):
+
+- domyślnie kolor jest przydzielany **automatycznie i deterministycznie** z
+  ustalonej 20-kolorowej palety na podstawie `puuid` gracza - nie wymaga to
+  żadnej konfiguracji i pozostaje stały między odświeżeniami,
+  - własny kolor można nadpisać ręcznie w zakładce Gracze, wpisując kod hex
+  (np. `#3498db`) w polu **color** - podobnie jak `nick`, jest on chroniony
+  przed nadpisaniem przez automatyczną synchronizację.
+
+Kolorowanie realizowane jest znacznikiem `<font color="...">` (a nie CSS),
+zgodnie z założeniem czystego HTML w tym projekcie.
 
 ## Uwagi i ograniczenia
 

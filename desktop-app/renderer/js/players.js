@@ -1,5 +1,5 @@
 const PLAYER_FIELDS = [
-  'nick', 'summonerName', 'summonerId', 'accountId', 'profileIconId', 'summonerLevel',
+  'nick', 'color', 'summonerName', 'summonerId', 'accountId', 'profileIconId', 'summonerLevel',
   'soloTier', 'soloRank', 'soloLP', 'soloWins', 'soloLosses', 'soloWinRatePct',
   'flexTier', 'flexRank', 'flexLP', 'flexWins', 'flexLosses', 'flexWinRatePct',
   'top1ChampionName', 'top1ChampionPoints', 'top2ChampionName', 'top2ChampionPoints',
@@ -16,6 +16,9 @@ async function loadPlayers() {
   tbody.innerHTML = '';
 
   const headRow = document.createElement('tr');
+  const previewTh = document.createElement('th');
+  previewTh.textContent = 'Podgląd';
+  headRow.appendChild(previewTh);
   const cornerTh = document.createElement('th');
   cornerTh.textContent = 'puuid';
   headRow.appendChild(cornerTh);
@@ -27,12 +30,15 @@ async function loadPlayers() {
   thead.appendChild(headRow);
 
   if (!players.length) {
-    tbody.innerHTML = `<tr><td colspan="${PLAYER_FIELDS.length + 1}">Brak zapisanych graczy - dane pojawią się po zebraniu pierwszego meczu.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${PLAYER_FIELDS.length + 2}">Brak zapisanych graczy - dane pojawią się po zebraniu pierwszego meczu.</td></tr>`;
     return;
   }
 
   players.forEach((player) => {
     const tr = document.createElement('tr');
+    const previewTd = document.createElement('td');
+    previewTd.innerHTML = colorizeName(player.nick || player.summonerName || player.puuid, getPlayerColor(player));
+    tr.appendChild(previewTd);
     const puuidTd = document.createElement('td');
     puuidTd.textContent = player.puuid ? player.puuid.slice(0, 8) + '...' : '';
     tr.appendChild(puuidTd);
@@ -43,9 +49,11 @@ async function loadPlayers() {
       input.type = 'text';
       input.value = player[field] != null ? player[field] : '';
       input.size = field === 'summonerName' || field === 'nick' ? 20 : 8;
+      if (field === 'color') input.placeholder = '#rrggbb (puste = kolor domyślny z palety)';
       input.addEventListener('change', async () => {
         await window.api.store.updatePlayerField(player.puuid, field, input.value);
         logEvent(`Zapisano ${field} dla ${player.summonerName || player.puuid}`);
+        if (field === 'nick' || field === 'color') loadPlayers();
       });
       td.appendChild(input);
       tr.appendChild(td);

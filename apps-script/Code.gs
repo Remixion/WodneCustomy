@@ -35,7 +35,7 @@ var MATCH_PLAYERS_HEADERS = [
 ];
 
 var PLAYERS_HEADERS = [
-  'puuid', 'nick', 'summonerName', 'summonerId', 'accountId', 'profileIconId', 'summonerLevel',
+  'puuid', 'nick', 'color', 'summonerName', 'summonerId', 'accountId', 'profileIconId', 'summonerLevel',
   'soloTier', 'soloRank', 'soloLP', 'soloWins', 'soloLosses', 'soloWinRatePct',
   'flexTier', 'flexRank', 'flexLP', 'flexWins', 'flexLosses', 'flexWinRatePct',
   'top1ChampionName', 'top1ChampionPoints', 'top2ChampionName', 'top2ChampionPoints',
@@ -45,7 +45,7 @@ var PLAYERS_HEADERS = [
 ];
 
 /** Kolumny, których automatyczna synchronizacja NIGDY nie nadpisuje (ręcznie edytowane). */
-var PROTECTED_ON_SYNC = ['notes', 'nick'];
+var PROTECTED_ON_SYNC = ['notes', 'nick', 'color'];
 
 function getSpreadsheet_() {
   return SpreadsheetApp.getActiveSpreadsheet();

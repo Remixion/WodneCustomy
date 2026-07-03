@@ -64,14 +64,14 @@ class LocalStore {
     return JSON.parse(fs.readFileSync(this.playersFile, 'utf8'));
   }
 
-  /** Scala nowo pobrane dane profilu z istniejącymi wpisami, zachowując ręczne notatki i nick. */
+  /** Scala nowo pobrane dane profilu z istniejącymi wpisami, zachowując ręczne notatki, nick i kolor. */
   upsertPlayers(freshPlayers) {
     const existing = this.listPlayers();
     const byPuuid = {};
     existing.forEach((p) => (byPuuid[p.puuid] = p));
     freshPlayers.forEach((p) => {
       const prev = byPuuid[p.puuid] || {};
-      byPuuid[p.puuid] = { ...prev, ...p, notes: prev.notes || '', nick: prev.nick || '' };
+      byPuuid[p.puuid] = { ...prev, ...p, notes: prev.notes || '', nick: prev.nick || '', color: prev.color || '' };
     });
     const merged = Object.values(byPuuid);
     fs.writeFileSync(this.playersFile, JSON.stringify(merged, null, 2), 'utf8');
