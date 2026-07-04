@@ -3,7 +3,7 @@ async function loadMatches() {
   const matches = await window.api.store.listMatches();
   tbody.innerHTML = '';
   if (!matches.length) {
-    tbody.innerHTML = '<tr><td colspan="9">Brak zarejestrowanych meczów. Rozegraj custom 5v5, a dane pojawią się tu automatycznie po jego zakończeniu.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10">Brak zarejestrowanych meczów. Rozegraj custom 5v5, a dane pojawią się tu automatycznie po jego zakończeniu.</td></tr>';
     return;
   }
   matches.forEach(({ match }) => {
@@ -49,8 +49,22 @@ async function loadMatches() {
       loadMatches();
     });
     actionsCell.appendChild(deleteBtn);
+    actionsCell.appendChild(document.createTextNode(' | '));
+
+    const deleteSheetsBtn = document.createElement('button');
+    deleteSheetsBtn.type = 'button';
+    deleteSheetsBtn.textContent = 'Usuń z Sheets';
+    deleteSheetsBtn.addEventListener('click', async () => {
+      if (!confirm(`Usunąć mecz ${match.matchId} z Arkusza Google? (dane lokalne zostaną)`)) return;
+      deleteSheetsBtn.disabled = true;
+      const result = await window.api.sync.deleteMatch(match.matchId);
+      logEvent(`Usunięto mecz ${match.matchId} z Sheets: ${result.ok ? 'OK' : 'błąd - ' + result.error}`);
+      deleteSheetsBtn.disabled = false;
+    });
+    actionsCell.appendChild(deleteSheetsBtn);
 
     tr.innerHTML = `
+      <td>${match.matchId}</td>
       <td>${formatDate(match.gameCreationDate)}</td>
       <td>${match.gameMode || ''}</td>
       <td>${match.mapId || ''}</td>
@@ -86,21 +100,21 @@ document.getElementById('push-all-btn').addEventListener('click', async () => {
 
 async function loadHistoryList() {
   const tbody = document.getElementById('history-tbody');
-  tbody.innerHTML = '<tr><td colspan="5">Wczytywanie historii z klienta...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="6">Wczytywanie historii z klienta...</td></tr>';
   let result;
   try {
     result = await window.api.history.listRecentMatches(20);
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="5">Błąd: ${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6">Błąd: ${err.message}</td></tr>`;
     return;
   }
   if (!result.ok) {
-    tbody.innerHTML = `<tr><td colspan="5">Błąd: ${result.error}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6">Błąd: ${result.error}</td></tr>`;
     return;
   }
   tbody.innerHTML = '';
   if (!result.matches.length) {
-    tbody.innerHTML = '<tr><td colspan="5">Brak meczów w lokalnej historii klienta.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6">Brak meczów w lokalnej historii klienta.</td></tr>';
     return;
   }
   result.matches.forEach((m) => {
@@ -133,6 +147,7 @@ async function loadHistoryList() {
     }
 
     tr.innerHTML = `
+      <td>${m.gameId}</td>
       <td>${formatDate(m.gameCreationDate)}</td>
       <td>${m.gameMode || ''}</td>
       <td>${m.mapId || ''}</td>

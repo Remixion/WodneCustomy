@@ -41,10 +41,13 @@ async function renderPlayers(players) {
     th.textContent = f;
     headRow.appendChild(th);
   });
+  const actionsTh = document.createElement('th');
+  actionsTh.textContent = 'Akcje';
+  headRow.appendChild(actionsTh);
   thead.appendChild(headRow);
 
   if (!players.length) {
-    tbody.innerHTML = `<tr><td colspan="${PLAYER_FIELDS.length + 3}">Brak zapisanych graczy.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${PLAYER_FIELDS.length + 4}">Brak zapisanych graczy.</td></tr>`;
     return;
   }
 
@@ -102,6 +105,25 @@ async function renderPlayers(players) {
       td.appendChild(input);
       tr.appendChild(td);
     });
+
+    const actionsTd = document.createElement('td');
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.textContent = 'Usuń z Sheets';
+    deleteBtn.addEventListener('click', async () => {
+      if (!confirm(`Usunąć gracza ${player.nick || player.summonerName || player.puuid} z Arkusza Google?`)) return;
+      deleteBtn.disabled = true;
+      try {
+        await postAction('deletePlayer', { puuid: player.puuid });
+        logEvent(`Usunięto gracza ${player.summonerName || player.puuid} z Sheets`);
+        load();
+      } catch (err) {
+        logEvent(`Błąd usuwania gracza: ${err.message}`);
+        deleteBtn.disabled = false;
+      }
+    });
+    actionsTd.appendChild(deleteBtn);
+    tr.appendChild(actionsTd);
 
     tbody.appendChild(tr);
   }

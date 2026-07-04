@@ -21,7 +21,7 @@ function renderMatches(matches) {
   const tbody = document.getElementById('matches-tbody');
   tbody.innerHTML = '';
   if (!matches.length) {
-    tbody.innerHTML = '<tr><td colspan="10">Brak zarejestrowanych meczów.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11">Brak zarejestrowanych meczów.</td></tr>';
     return;
   }
   const sorted = matches.slice().sort((a, b) => new Date(b.gameCreationDate) - new Date(a.gameCreationDate));
@@ -47,8 +47,27 @@ function renderMatches(matches) {
     link.href = `match.html?matchId=${encodeURIComponent(match.matchId)}`;
     link.textContent = 'Szczegóły';
     actionsTd.appendChild(link);
+    actionsTd.appendChild(document.createTextNode(' | '));
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.textContent = 'Usuń z Sheets';
+    deleteBtn.addEventListener('click', async () => {
+      if (!confirm(`Usunąć mecz ${match.matchId} z Arkusza Google?`)) return;
+      deleteBtn.disabled = true;
+      try {
+        await postAction('deleteMatch', { matchId: match.matchId });
+        logEvent(`Usunięto mecz ${match.matchId} z Sheets`);
+        load();
+      } catch (err) {
+        logEvent(`Błąd usuwania meczu ${match.matchId}: ${err.message}`);
+        deleteBtn.disabled = false;
+      }
+    });
+    actionsTd.appendChild(deleteBtn);
 
     tr.innerHTML = `
+      <td>${match.matchId}</td>
       <td>${formatDate(match.gameCreationDate)}</td>
       <td>${match.gameMode || ''}</td>
       <td>${match.mapId || ''}</td>

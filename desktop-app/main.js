@@ -151,6 +151,7 @@ ipcMain.handle('store:update-match-player-field', (_evt, { matchId, puuid, field
 ipcMain.handle('store:delete-match', (_evt, matchId) => store.deleteMatch(matchId));
 ipcMain.handle('store:list-players', () => store.listPlayers());
 ipcMain.handle('store:update-player-field', (_evt, { puuid, field, value }) => store.updatePlayerField(puuid, field, value));
+ipcMain.handle('store:delete-player', (_evt, puuid) => store.deletePlayer(puuid));
 
 // ---- IPC: synchronizacja z Google Sheets ----
 ipcMain.handle('sync:push-match', (_evt, matchId) => syncMatchToSheets(matchId));
@@ -167,6 +168,24 @@ ipcMain.handle('sync:test-connection', async () => {
     const cfg = configStore.getAll();
     const res = await getFromAppsScript(cfg.appsScriptUrl);
     return res;
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+});
+ipcMain.handle('sync:delete-match', async (_evt, matchId) => {
+  const cfg = configStore.getAll();
+  if (!cfg.appsScriptUrl) return { ok: false, error: 'Brak adresu URL Apps Script w ustawieniach.' };
+  try {
+    return await postToAppsScript(cfg.appsScriptUrl, cfg.sharedSecret, 'deleteMatch', { matchId });
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+});
+ipcMain.handle('sync:delete-player', async (_evt, puuid) => {
+  const cfg = configStore.getAll();
+  if (!cfg.appsScriptUrl) return { ok: false, error: 'Brak adresu URL Apps Script w ustawieniach.' };
+  try {
+    return await postToAppsScript(cfg.appsScriptUrl, cfg.sharedSecret, 'deletePlayer', { puuid });
   } catch (err) {
     return { ok: false, error: String(err) };
   }

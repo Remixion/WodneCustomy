@@ -14,12 +14,15 @@ contextBridge.exposeInMainWorld('api', {
     deleteMatch: (matchId) => ipcRenderer.invoke('store:delete-match', matchId),
     listPlayers: () => ipcRenderer.invoke('store:list-players'),
     updatePlayerField: (puuid, field, value) => ipcRenderer.invoke('store:update-player-field', { puuid, field, value }),
+    deletePlayer: (puuid) => ipcRenderer.invoke('store:delete-player', puuid),
   },
   sync: {
     pushMatch: (matchId) => ipcRenderer.invoke('sync:push-match', matchId),
     pushAllMatches: () => ipcRenderer.invoke('sync:push-all-matches'),
     pushAllPlayers: () => ipcRenderer.invoke('sync:push-all-players'),
     testConnection: () => ipcRenderer.invoke('sync:test-connection'),
+    deleteMatch: (matchId) => ipcRenderer.invoke('sync:delete-match', matchId),
+    deletePlayer: (puuid) => ipcRenderer.invoke('sync:delete-player', puuid),
   },
   lcu: {
     getStatus: () => ipcRenderer.invoke('lcu:get-status'),

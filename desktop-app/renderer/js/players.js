@@ -31,10 +31,13 @@ async function loadPlayers() {
     th.textContent = f;
     headRow.appendChild(th);
   });
+  const actionsTh = document.createElement('th');
+  actionsTh.textContent = 'Akcje';
+  headRow.appendChild(actionsTh);
   thead.appendChild(headRow);
 
   if (!players.length) {
-    tbody.innerHTML = `<tr><td colspan="${PLAYER_FIELDS.length + 3}">Brak zapisanych graczy - dane pojawią się po zebraniu pierwszego meczu.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${PLAYER_FIELDS.length + 4}">Brak zapisanych graczy - dane pojawią się po zebraniu pierwszego meczu.</td></tr>`;
     return;
   }
 
@@ -89,6 +92,33 @@ async function loadPlayers() {
       tr.appendChild(td);
     });
 
+    const actionsTd = document.createElement('td');
+
+    const deleteLocalBtn = document.createElement('button');
+    deleteLocalBtn.type = 'button';
+    deleteLocalBtn.textContent = 'Usuń lokalnie';
+    deleteLocalBtn.addEventListener('click', async () => {
+      if (!confirm(`Usunąć gracza ${player.nick || player.summonerName || player.puuid} z lokalnego magazynu? (nie usuwa danych z arkusza)`)) return;
+      await window.api.store.deletePlayer(player.puuid);
+      logEvent(`Usunięto gracza ${player.summonerName || player.puuid} lokalnie`);
+      loadPlayers();
+    });
+    actionsTd.appendChild(deleteLocalBtn);
+    actionsTd.appendChild(document.createTextNode(' | '));
+
+    const deleteSheetsBtn = document.createElement('button');
+    deleteSheetsBtn.type = 'button';
+    deleteSheetsBtn.textContent = 'Usuń z Sheets';
+    deleteSheetsBtn.addEventListener('click', async () => {
+      if (!confirm(`Usunąć gracza ${player.nick || player.summonerName || player.puuid} z Arkusza Google? (dane lokalne zostaną)`)) return;
+      deleteSheetsBtn.disabled = true;
+      const result = await window.api.sync.deletePlayer(player.puuid);
+      logEvent(`Usunięto gracza ${player.summonerName || player.puuid} z Sheets: ${result.ok ? 'OK' : 'błąd - ' + result.error}`);
+      deleteSheetsBtn.disabled = false;
+    });
+    actionsTd.appendChild(deleteSheetsBtn);
+
+    tr.appendChild(actionsTd);
     tbody.appendChild(tr);
   }
 }

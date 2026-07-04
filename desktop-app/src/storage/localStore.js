@@ -86,6 +86,12 @@ class LocalStore {
     fs.writeFileSync(this.playersFile, JSON.stringify(players, null, 2), 'utf8');
     return true;
   }
+
+  deletePlayer(puuid) {
+    const players = this.listPlayers().filter((p) => p.puuid !== puuid);
+    fs.writeFileSync(this.playersFile, JSON.stringify(players, null, 2), 'utf8');
+    return true;
+  }
 }
 
 module.exports = { LocalStore };
