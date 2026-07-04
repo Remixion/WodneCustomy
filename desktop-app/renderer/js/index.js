@@ -145,6 +145,47 @@ async function loadHistoryList() {
 
 document.getElementById('history-list-btn').addEventListener('click', loadHistoryList);
 
+function fileBaseName(filePath) {
+  const parts = filePath.split(/[\\/]/);
+  return parts[parts.length - 1] || filePath;
+}
+
+function renderRoflImportResults(results) {
+  const tbody = document.getElementById('rofl-import-tbody');
+  results.forEach((r) => {
+    const tr = document.createElement('tr');
+
+    const fileTd = document.createElement('td');
+    fileTd.textContent = fileBaseName(r.filePath);
+    tr.appendChild(fileTd);
+
+    const matchTd = document.createElement('td');
+    matchTd.textContent = r.matchId || '-';
+    tr.appendChild(matchTd);
+
+    const statusTd = document.createElement('td');
+    statusTd.textContent = r.ok ? (r.full ? 'pełne dane' : 'tylko podstawowy wpis') : `błąd - ${r.error}`;
+    tr.appendChild(statusTd);
+
+    const actionsTd = document.createElement('td');
+    if (r.ok && r.matchId) {
+      const pushBtn = document.createElement('button');
+      pushBtn.type = 'button';
+      pushBtn.textContent = 'Wyślij do Sheets';
+      pushBtn.addEventListener('click', async () => {
+        pushBtn.disabled = true;
+        const pushResult = await window.api.sync.pushMatch(r.matchId);
+        logEvent(`Wysłano mecz ${r.matchId} do Sheets: ${pushResult.ok ? 'OK' : 'błąd - ' + pushResult.error}`);
+        pushBtn.disabled = false;
+      });
+      actionsTd.appendChild(pushBtn);
+    }
+    tr.appendChild(actionsTd);
+
+    tbody.prepend(tr);
+  });
+}
+
 document.getElementById('rofl-pick-btn').addEventListener('click', async () => {
   const resultEl = document.getElementById('rofl-import-result');
   const pickBtn = document.getElementById('rofl-pick-btn');
@@ -158,6 +199,7 @@ document.getElementById('rofl-pick-btn').addEventListener('click', async () => {
     const okPartial = results.filter((r) => r.ok && !r.full).length;
     const failed = results.filter((r) => !r.ok).length;
     resultEl.textContent = `Zaimportowano: ${okFull} z pełnymi danymi, ${okPartial} tylko podstawowo, błędów: ${failed}`;
+    renderRoflImportResults(results);
     results.forEach((r) => {
       logEvent(
         r.ok
