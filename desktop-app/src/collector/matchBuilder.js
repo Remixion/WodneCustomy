@@ -10,6 +10,35 @@ function computeKda(k, d, a) {
 }
 
 /**
+ * Odtwarza rolę gracza z pary timeline.lane + timeline.role (fallback, gdy
+ * eogStatsBlock/detectedTeamPosition nie jest dostępny - czyli przy imporcie
+ * z historii klienta albo z pliku .rofl). Samo "lane" bywa mylące w
+ * customach (np. dwóch graczy oznaczonych jako JUNGLE), dlatego łączymy je
+ * z "role":
+ *   lane=JUNGLE, role=NONE    -> JUNGLE
+ *   lane=TOP                  -> TOP
+ *   lane=MIDDLE/MID, role=SOLO -> MIDDLE
+ *   lane=BOTTOM/BOT, role=CARRY/DUO_CARRY -> BOTTOM
+ *   lane=BOTTOM/BOT, role=SUPPORT/DUO_SUPPORT -> SUPPORT
+ */
+function deriveTeamPosition(lane, role) {
+  if (!lane) return '';
+  if (lane === 'TOP') return 'TOP';
+  if (lane === 'JUNGLE') return 'JUNGLE';
+  if (lane === 'MIDDLE' || lane === 'MID') return 'MIDDLE';
+  if (lane === 'BOTTOM' || lane === 'BOT') {
+    if (role === 'SUPPORT' || role === 'DUO_SUPPORT') return 'SUPPORT';
+    return 'BOTTOM';
+  }
+  return lane;
+}
+
+/** eogStatsBlock/detectedTeamPosition nazywa wsparcie "UTILITY" - ujednolicamy do "SUPPORT". */
+function normalizeTeamPosition(position) {
+  return position === 'UTILITY' ? 'SUPPORT' : position;
+}
+
+/**
  * Buduje znormalizowany rekord meczu + listę graczy na bazie
  * /lol-match-history/v1/games/{gameId} (ten sam kształt danych co publiczne
  * Riot Match API). Współdzielone przez: automatyczne przechwytywanie po
@@ -115,7 +144,10 @@ async function buildMatchFromGameId(client, gameId, { includeEogStatsBlock = fal
       summonerName,
       championName: champMap[p.championId] || `#${p.championId}`,
       championId: p.championId,
-      teamPosition: (eogPlayer && eogPlayer.detectedTeamPosition) || (p.timeline && p.timeline.lane) || '',
+      teamPosition: normalizeTeamPosition(
+        (eogPlayer && eogPlayer.detectedTeamPosition) ||
+          deriveTeamPosition(p.timeline && p.timeline.lane, p.timeline && p.timeline.role)
+      ),
       spell1: p.spell1Id,
       spell2: p.spell2Id,
       primaryRuneStyle: stats.perkPrimaryStyle || '',
