@@ -59,6 +59,11 @@ contextBridge.exposeInMainWorld('api', {
     listFolder: () => ipcRenderer.invoke('legacyjson:list-folder'),
     detectDefaultFolder: () => ipcRenderer.invoke('legacyjson:detect-default-folder'),
   },
+  leagueSheet: {
+    pickFile: () => ipcRenderer.invoke('leaguesheet:pick-file'),
+    preview: (filePath) => ipcRenderer.invoke('leaguesheet:preview', filePath),
+    import: (filePath, gids) => ipcRenderer.invoke('leaguesheet:import', { filePath, gids }),
+  },
   collector: {
     onStatus: (cb) => ipcRenderer.on('collector:status', (_evt, data) => cb(data)),
     onMatchSaved: (cb) => ipcRenderer.on('collector:match-saved', (_evt, data) => cb(data)),

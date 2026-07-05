@@ -703,6 +703,113 @@ document.getElementById('legacyjson-pick-btn').addEventListener('click', async (
   }
 });
 
+// ---- Import arkusza ligi (Lewa/Prawa) - patrz komentarz w leagueSheetParser.js ----
+
+let leagueSheetFilePath = null;
+let leagueSheetRows = [];
+
+function sideNickList(players, side) {
+  return players
+    .filter((p) => p.team === side)
+    .map((p) => p.summonerName)
+    .join(', ');
+}
+
+function renderLeagueSheetTable() {
+  const tbody = document.getElementById('leaguesheet-tbody');
+  tbody.innerHTML = '';
+  if (!leagueSheetRows.length) {
+    tbody.innerHTML = '<tr><td colspan="8">Brak wczytanych wierszy.</td></tr>';
+    return;
+  }
+  leagueSheetRows.forEach((r) => {
+    const tr = document.createElement('tr');
+    const checkTd = document.createElement('td');
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = r.ok && !r.alreadyImported;
+    checkbox.dataset.gid = r.gid;
+    checkTd.appendChild(checkbox);
+    tr.appendChild(checkTd);
+
+    if (!r.ok) {
+      tr.innerHTML += `<td>${r.gid}</td><td colspan="6">Błąd: ${r.error}</td>`;
+      tbody.appendChild(tr);
+      return;
+    }
+
+    tr.innerHTML += `
+      <td>${r.gid}</td>
+      <td>${formatDate(r.match.gameCreationDate)}</td>
+      <td>${formatTeamLabel(r.match.winningTeam)}</td>
+      <td>${sideNickList(r.players, 'LEFT')}</td>
+      <td>${sideNickList(r.players, 'RIGHT')}</td>
+      <td>${r.match.matchId}</td>
+      <td>${r.alreadyImported ? 'Tak' : 'Nie'}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+document.getElementById('leaguesheet-pick-btn').addEventListener('click', async () => {
+  const resultEl = document.getElementById('leaguesheet-pick-result');
+  const filePath = await window.api.leagueSheet.pickFile();
+  if (!filePath) return;
+  leagueSheetFilePath = filePath;
+  resultEl.textContent = 'Wczytywanie...';
+  const preview = await window.api.leagueSheet.preview(filePath);
+  if (!preview.ok) {
+    resultEl.textContent = `Błąd: ${preview.error}`;
+    return;
+  }
+  leagueSheetRows = preview.rows;
+  resultEl.textContent = `Wczytano ${fileBaseName(filePath)} - ${leagueSheetRows.length} wiersz(y).`;
+  renderLeagueSheetTable();
+});
+
+document.getElementById('leaguesheet-select-all-btn').addEventListener('click', () => {
+  document.querySelectorAll('#leaguesheet-tbody input[type="checkbox"]').forEach((cb) => (cb.checked = true));
+});
+document.getElementById('leaguesheet-select-none-btn').addEventListener('click', () => {
+  document.querySelectorAll('#leaguesheet-tbody input[type="checkbox"]').forEach((cb) => (cb.checked = false));
+});
+
+document.getElementById('leaguesheet-import-btn').addEventListener('click', async () => {
+  const statusEl = document.getElementById('leaguesheet-status');
+  if (!leagueSheetFilePath) {
+    statusEl.textContent = 'Wybierz najpierw plik arkusza.';
+    return;
+  }
+  const gids = Array.from(document.querySelectorAll('#leaguesheet-tbody input[type="checkbox"]:checked')).map(
+    (cb) => cb.dataset.gid
+  );
+  if (!gids.length) {
+    statusEl.textContent = 'Nie zaznaczono żadnego wiersza do importu.';
+    return;
+  }
+  statusEl.textContent = `Importowanie ${gids.length} mecz(ów)...`;
+  const importBtn = document.getElementById('leaguesheet-import-btn');
+  importBtn.disabled = true;
+  try {
+    const outcome = await window.api.leagueSheet.import(leagueSheetFilePath, gids);
+    if (!outcome.ok) {
+      statusEl.textContent = `Błąd: ${outcome.error}`;
+      return;
+    }
+    const failed = outcome.results.filter((r) => !r.ok);
+    statusEl.textContent = `Zaimportowano ${outcome.results.length - failed.length}/${outcome.results.length} mecz(ów).`;
+    failed.forEach((r) => logEvent(`Import arkusza ligi - GID ${r.gid}: błąd - ${r.error}`));
+    const preview = await window.api.leagueSheet.preview(leagueSheetFilePath);
+    if (preview.ok) {
+      leagueSheetRows = preview.rows;
+      renderLeagueSheetTable();
+    }
+    loadMatches();
+  } finally {
+    importBtn.disabled = false;
+  }
+});
+
 window.api.lcu.onStatus(applyLcuStatus);
 window.api.collector.onStatus((s) => {
   document.getElementById('collector-status').textContent = s.collecting ? 'zbieranie danych zakończonego meczu...' : 'bezczynny';

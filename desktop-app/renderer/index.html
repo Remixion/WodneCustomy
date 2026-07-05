@@ -261,6 +261,50 @@
       </table>
     </section>
 
+    <section id="leaguesheet-import-section">
+      <h2>Import arkusza ligi (Lewa/Prawa)</h2>
+      <p>
+        Import ręcznie prowadzonego arkusza meczów sprzed tej apki (plik
+        .csv/.tsv z kolumnami GID, Patch, Data, WIN, Top_L.../Top_P... itd.).
+        Ta lista nie zna prawdziwej strony Blue/Red - miała tylko losowo
+        przydzieloną "Lewą"/"Prawą" stronę, więc zapisujemy ją właśnie jako
+        taką (osobne sekcje "Strona lewa"/"Strona prawa" w szczegółach meczu,
+        nie "Drużyna niebieska/czerwona"). Gracze nie mają tu prawdziwego
+        konta League (same nicki) - statystyki tej samej osoby połączą się
+        między meczami z tego arkusza, ale nie automatycznie z jej prawdziwym
+        kontem. Jeśli kolumna <code>LoLID</code> jest wypełniona prawdziwym
+        Game ID (np. znalezionym wcześniej przez skaner albo z nazwy pliku
+        .rofl), użyjemy go jako identyfikatora meczu - dzięki temu późniejsze
+        znalezienie pełnych danych tej samej gry nadpisze ten wpis zamiast
+        tworzyć duplikat.
+      </p>
+      <p>
+        <button id="leaguesheet-pick-btn" type="button">Wybierz plik arkusza</button>
+        <span id="leaguesheet-pick-result"></span>
+      </p>
+      <p>
+        <button id="leaguesheet-select-all-btn" type="button">Zaznacz wszystkie</button>
+        <button id="leaguesheet-select-none-btn" type="button">Odznacz wszystkie</button>
+        <button id="leaguesheet-import-btn" type="button">Zaimportuj zaznaczone</button>
+      </p>
+      <p id="leaguesheet-status"></p>
+      <table id="leaguesheet-table" border="1">
+        <thead>
+          <tr>
+            <th></th>
+            <th>GID</th>
+            <th>Data</th>
+            <th>Wygrana</th>
+            <th>Strona lewa</th>
+            <th>Strona prawa</th>
+            <th>Mecz ID</th>
+            <th>W bazie?</th>
+          </tr>
+        </thead>
+        <tbody id="leaguesheet-tbody"></tbody>
+      </table>
+    </section>
+
     <section id="log-section">
       <h2>Dziennik zdarzeń</h2>
       <ul id="log-list"></ul>

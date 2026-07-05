@@ -28,10 +28,37 @@ async function load() {
   renderMatchFields(data.match);
   const allPlayers = await window.api.store.listPlayers();
   const playersByPuuid = buildPlayersByPuuid(allPlayers);
-  const blue = data.players.filter((p) => p.team === 'BLUE');
-  const red = data.players.filter((p) => p.team === 'RED');
-  renderTeamTable('blue-team-table', blue, playersByPuuid);
-  renderTeamTable('red-team-table', red, playersByPuuid);
+  renderTeams(data.players, playersByPuuid);
+}
+
+/**
+ * Buduje po jednej sekcji/tabeli na każdą wartość player.team faktycznie
+ * obecną w meczu - zwykle BLUE/RED (żywe przechwytywanie, .rofl, historia
+ * klienta), ale mecze z arkusza ligi sprzed tej apki mają LEFT/RIGHT (strona
+ * przydzielana wtedy losowo, bez znajomości prawdziwej strony Blue/Red).
+ */
+function renderTeams(players, playersByPuuid) {
+  const container = document.getElementById('teams-container');
+  container.innerHTML = '';
+  const teams = sortTeamValues([...new Set(players.map((p) => p.team).filter(Boolean))]);
+
+  teams.forEach((team) => {
+    const section = document.createElement('section');
+    const heading = document.createElement('h2');
+    heading.textContent = formatTeamLabel(team);
+    section.appendChild(heading);
+
+    const table = document.createElement('table');
+    table.border = '1';
+    const thead = document.createElement('thead');
+    const tbody = document.createElement('tbody');
+    table.appendChild(thead);
+    table.appendChild(tbody);
+    section.appendChild(table);
+    container.appendChild(section);
+
+    renderTeamTable(table, players.filter((p) => p.team === team), playersByPuuid);
+  });
 }
 
 function renderMatchFields(match) {
@@ -78,8 +105,7 @@ function renderMatchFields(match) {
   tbody.appendChild(rawTr);
 }
 
-function renderTeamTable(tableId, players, playersByPuuid) {
-  const table = document.getElementById(tableId);
+function renderTeamTable(table, players, playersByPuuid) {
   const thead = table.querySelector('thead');
   const tbody = table.querySelector('tbody');
   thead.innerHTML = '';

@@ -32,8 +32,7 @@ async function load() {
     renderMatchFields(match);
     const playersByPuuid = buildPlayersByPuuid(data.players);
     const players = data.matchPlayers.filter((p) => String(p.matchId) === String(matchId));
-    renderTeamTable('blue-team-table', players.filter((p) => p.team === 'BLUE'), playersByPuuid);
-    renderTeamTable('red-team-table', players.filter((p) => p.team === 'RED'), playersByPuuid);
+    renderTeams(players, playersByPuuid);
   } catch (err) {
     statusEl.textContent = `Błąd wczytywania danych: ${err.message}`;
   }
@@ -90,8 +89,37 @@ function renderMatchFields(match) {
   tbody.appendChild(rawTr);
 }
 
-function renderTeamTable(tableId, players, playersByPuuid) {
-  const table = document.getElementById(tableId);
+/**
+ * Buduje po jednej sekcji/tabeli na każdą wartość player.team faktycznie
+ * obecną w meczu - zwykle BLUE/RED, ale mecze z arkusza ligi sprzed tej apki
+ * mają LEFT/RIGHT (strona przydzielana wtedy losowo, bez znajomości
+ * prawdziwej strony Blue/Red).
+ */
+function renderTeams(players, playersByPuuid) {
+  const container = document.getElementById('teams-container');
+  container.innerHTML = '';
+  const teams = sortTeamValues([...new Set(players.map((p) => p.team).filter(Boolean))]);
+
+  teams.forEach((team) => {
+    const section = document.createElement('section');
+    const heading = document.createElement('h2');
+    heading.textContent = formatTeamLabel(team);
+    section.appendChild(heading);
+
+    const table = document.createElement('table');
+    table.border = '1';
+    const thead = document.createElement('thead');
+    const tbody = document.createElement('tbody');
+    table.appendChild(thead);
+    table.appendChild(tbody);
+    section.appendChild(table);
+    container.appendChild(section);
+
+    renderTeamTable(table, players.filter((p) => p.team === team), playersByPuuid);
+  });
+}
+
+function renderTeamTable(table, players, playersByPuuid) {
   const thead = table.querySelector('thead');
   const tbody = table.querySelector('tbody');
   thead.innerHTML = '';

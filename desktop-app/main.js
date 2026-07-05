@@ -7,6 +7,7 @@ const { fetchRecentMatchSummaries, fetchMatchSummariesSince } = require('./src/c
 const { scanGameIdRange } = require('./src/collector/gameIdScanner');
 const { parseGameIdFromRoflFilename, detectDefaultReplaysFolder, listRoflFilesInFolder, extractEmbeddedStats } = require('./src/collector/roflParser');
 const { detectDefaultLegacyJsonFolder, listLegacyJsonFilesInFolder, buildMatchFromLegacyJson, extractGameId } = require('./src/collector/legacyJsonParser');
+const { parseLeagueSheetFile } = require('./src/collector/leagueSheetParser');
 const { enrichPlayer } = require('./src/collector/playerProfile');
 const { LocalStore } = require('./src/storage/localStore');
 const { ConfigStore } = require('./src/config/configStore');
@@ -688,4 +689,54 @@ ipcMain.handle('legacyjson:import', async (_evt, filePaths) => {
     }
   }
   return results;
+});
+
+// ---- IPC: import ręcznie prowadzonego arkusza ligi (patrz komentarz w leagueSheetParser.js) ----
+ipcMain.handle('leaguesheet:pick-file', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Wybierz plik arkusza ligi (.csv/.tsv)',
+    filters: [{ name: 'Arkusz ligi', extensions: ['csv', 'tsv', 'txt'] }],
+    properties: ['openFile'],
+  });
+  if (result.canceled || !result.filePaths.length) return null;
+  return result.filePaths[0];
+});
+
+// Podgląd całego arkusza - wyłącznie odczyt, nic nie zapisuje ani nie synchronizuje.
+ipcMain.handle('leaguesheet:preview', (_evt, filePath) => {
+  try {
+    const rows = parseLeagueSheetFile(filePath);
+    const existingIds = new Set(store.listMatches().map((m) => String(m.match.matchId)));
+    return {
+      ok: true,
+      rows: rows.map((r) => ({ ...r, alreadyImported: r.ok ? existingIds.has(r.match.matchId) : false })),
+    };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+});
+
+ipcMain.handle('leaguesheet:import', async (_evt, { filePath, gids }) => {
+  try {
+    const rows = parseLeagueSheetFile(filePath);
+    const gidSet = Array.isArray(gids) ? new Set(gids.map(String)) : null;
+    const client = createOneOffLcuClient();
+    const results = [];
+    for (const r of rows) {
+      if (gidSet && !gidSet.has(String(r.gid))) continue;
+      if (!r.ok) {
+        results.push({ gid: r.gid, ok: false, error: r.error });
+        continue;
+      }
+      try {
+        const result = await processCollectedMatch(client, { match: r.match, players: r.players });
+        results.push({ gid: r.gid, ok: true, matchId: result.match.matchId });
+      } catch (err) {
+        results.push({ gid: r.gid, ok: false, error: String(err) });
+      }
+    }
+    return { ok: true, results };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
 });

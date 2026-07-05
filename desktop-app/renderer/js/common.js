@@ -27,17 +27,49 @@ function qs(name) {
   return new URLSearchParams(window.location.search).get(name);
 }
 
-/** Czytelna etykieta źródła danych meczu (patrz match.dataSource) - zobacz też komentarze w matchBuilder.js/legacyJsonParser.js/roflParser.js. */
+/** Czytelna etykieta źródła danych meczu (patrz match.dataSource) - zobacz też komentarze w matchBuilder.js/legacyJsonParser.js/roflParser.js/leagueSheetParser.js. */
 const DATA_SOURCE_LABELS = {
   'lcu-live': 'Na żywo (koniec gry)',
   'lcu-history': 'Historia klienta League',
   'rofl-stats': 'Statystyki z pliku .rofl',
   'legacy-json': 'Stary plik JSON',
+  'league-sheet': 'Arkusz ligi (ręcznie wpisane)',
   placeholder: 'Brak danych (tylko ID)',
 };
 
 function formatDataSource(dataSource) {
   return DATA_SOURCE_LABELS[dataSource] || dataSource || '-';
+}
+
+/**
+ * Etykieta strony meczu (pole player.team / match.winningTeam). BLUE/RED to
+ * prawdziwe, potwierdzone strony z klienta League. LEFT/RIGHT pochodzą z
+ * ręcznie prowadzonego arkusza ligi sprzed tej apki, gdzie strona była
+ * przydzielana losowo (nieznana wtedy prawdziwa strona Blue/Red) - stąd
+ * osobna etykieta, żeby nie sugerować pewności, której w rzeczywistości nie ma.
+ */
+const TEAM_LABELS = {
+  BLUE: 'Drużyna niebieska',
+  RED: 'Drużyna czerwona',
+  LEFT: 'Strona lewa (nieprzypisana do Blue/Red)',
+  RIGHT: 'Strona prawa (nieprzypisana do Blue/Red)',
+};
+const TEAM_ORDER = ['BLUE', 'LEFT', 'RED', 'RIGHT'];
+
+function formatTeamLabel(team) {
+  return TEAM_LABELS[team] || team || 'Nieznana strona';
+}
+
+/** Sortuje listę wartości "team" tak, żeby BLUE/LEFT zawsze wypadały przed RED/RIGHT, a nieznane na końcu. */
+function sortTeamValues(teams) {
+  return teams.slice().sort((a, b) => {
+    const ia = TEAM_ORDER.indexOf(a);
+    const ib = TEAM_ORDER.indexOf(b);
+    if (ia === -1 && ib === -1) return a.localeCompare(b);
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
 }
 
 // ---- Statystyki pomocnicze (współdzielone przez stats.js / profile.js) ----

@@ -180,6 +180,30 @@ doimportowanie takiego meczu:
    modyfikacji pliku, jeśli plik jej nie ma) - dzięki temu starszy mecz zawsze
    dostaje mniejsze ID niż nowszy i sortowanie kolumny `matchId` w Arkuszu
    odtwarza kolejność chronologiczną, mimo braku prawdziwego ID z Riota.
+5. **Import arkusza ligi (Lewa/Prawa)** - dla ręcznie prowadzonej listy
+   meczów sprzed tej apki (plik `.csv`/`.tsv` z kolumnami `GID`, `Patch`,
+   `Data`, `WIN` (`LEWA`/`PRAWA`), `Top_L`/`Jng_L`/`Mid_L`/`Adc_L`/`Supp_L`
+   (nicki strony "Lewa"), `Top_P`/.../`Supp_P` (nicki strony "Prawa"),
+   `Champ_*` (championi w tej samej kolejności ról/stron) i opcjonalnie
+   `LoLID`). W zakładce **Mecze**, sekcja "Import arkusza ligi", wybierz
+   plik - pokaże się lista wszystkich wierszy z zaznaczeniem (domyślnie
+   zaznaczone te jeszcze niezaimportowane), "Zaimportuj zaznaczone" zapisuje
+   je do lokalnej bazy i synchronizuje z Arkuszem.
+
+   Ta lista nie zna prawdziwej strony Blue/Red z klienta League - "Lewa"/
+   "Prawa" była przydzielana losowo przy zapisywaniu meczu. Dlatego apka
+   zapisuje ją jako osobne `team = "LEFT"/"RIGHT"` (nie `"BLUE"/"RED"`) -
+   szczegóły meczu pokazują wtedy sekcje "Strona lewa"/"Strona prawa" zamiast
+   "Drużyna niebieska/czerwona", żeby nie sugerować pewności, której nie ma.
+   Gracze w tym imporcie nie mają prawdziwego `puuid` (same nicki) - dostają
+   zastępczy, stabilny klucz na bazie znormalizowanego nicku, więc statystyki
+   tej samej osoby łączą się między meczami z tego arkusza, ale nie
+   automatycznie z jej prawdziwym kontem League. Jeśli kolumna `LoLID` jest
+   już wypełniona prawdziwym Game ID (np. znalezionym wcześniej skanerem
+   albo z nazwy pliku `.rofl`), zostanie użyta jako `matchId` - dzięki temu
+   późniejsze znalezienie pełnych danych tej samej gry (żywe przechwytywanie,
+   `.rofl`, historia klienta, skaner) automatycznie nadpisze ten wpis
+   prawdziwym Blue/Red i pełnymi statystykami zamiast tworzyć duplikat.
 
 ### Budowanie pliku instalacyjnego (.exe / .dmg / .AppImage)
 

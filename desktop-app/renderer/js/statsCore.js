@@ -56,8 +56,13 @@ function computeGeneralStats(matches, matchPlayers) {
   const totalMatches = matches.length;
   const totalDurationSec = matches.reduce((acc, m) => acc + numberOr(m.gameDurationSec), 0);
   const sortedByDuration = matches.slice().sort((a, b) => numberOr(b.gameDurationSec) - numberOr(a.gameDurationSec));
-  const blueWins = matches.filter((m) => m.winningTeam === 'BLUE').length;
-  const redWins = matches.filter((m) => m.winningTeam === 'RED').length;
+  // Mecze z arkusza ligi mają stronę LEFT/RIGHT zamiast BLUE/RED (przydzielaną
+  // wtedy losowo, bez znajomości prawdziwej strony) - liczymy je osobno od
+  // procentu zwycięstw niebiesko/czerwonych, żeby go nie rozwadniały.
+  const blueRedMatches = matches.filter((m) => m.winningTeam === 'BLUE' || m.winningTeam === 'RED');
+  const blueWins = blueRedMatches.filter((m) => m.winningTeam === 'BLUE').length;
+  const redWins = blueRedMatches.filter((m) => m.winningTeam === 'RED').length;
+  const blueRedMatchesCount = blueRedMatches.length;
   const championPicks = mostFrequent((matchPlayers || []).map((p) => p.championName));
 
   const allBans = [];
@@ -78,8 +83,8 @@ function computeGeneralStats(matches, matchPlayers) {
     shortestMatch: sortedByDuration[sortedByDuration.length - 1] || null,
     blueWins,
     redWins,
-    blueWinRatePct: totalMatches ? (blueWins / totalMatches) * 100 : 0,
-    redWinRatePct: totalMatches ? (redWins / totalMatches) * 100 : 0,
+    blueWinRatePct: blueRedMatchesCount ? (blueWins / blueRedMatchesCount) * 100 : 0,
+    redWinRatePct: blueRedMatchesCount ? (redWins / blueRedMatchesCount) * 100 : 0,
     mostPickedChampion: championPicks.value,
     mostPickedChampionCount: championPicks.count,
     mostBannedChampion: bannedChampion.value,
