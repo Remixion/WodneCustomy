@@ -330,9 +330,13 @@ ipcMain.handle('history:list-matches-since', async (_evt, sinceDateIso) => {
     if (!client) return { ok: false, error: 'Klient League of Legends nie jest uruchomiony.' };
     const puuid = await getCurrentSummonerPuuid(client);
     if (!puuid) return { ok: false, error: 'Nie udało się odczytać puuid zalogowanego gracza.' };
-    const summaries = await fetchMatchSummariesSince(client, puuid, sinceDateIso);
+    const { matches: summaries, truncated } = await fetchMatchSummariesSince(client, puuid, sinceDateIso);
     const existingIds = new Set(store.listMatches().map((m) => String(m.match.matchId)));
-    return { ok: true, matches: summaries.map((s) => ({ ...s, alreadyImported: existingIds.has(s.gameId) })) };
+    return {
+      ok: true,
+      truncated,
+      matches: summaries.map((s) => ({ ...s, alreadyImported: existingIds.has(s.gameId) })),
+    };
   } catch (err) {
     return { ok: false, error: String(err) };
   }

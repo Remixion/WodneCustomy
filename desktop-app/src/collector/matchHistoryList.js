@@ -27,10 +27,19 @@ async function fetchGamePage(client, puuid, begIndex, endIndex) {
     }));
 }
 
+function dedupeByGameId(games) {
+  const seen = new Set();
+  return games.filter((g) => {
+    if (seen.has(g.gameId)) return false;
+    seen.add(g.gameId);
+    return true;
+  });
+}
+
 /** Pobiera skróconą listę ostatnich `count` meczów. */
 async function fetchRecentMatchSummaries(client, puuid, count = 20) {
   const games = await fetchGamePage(client, puuid, 0, Math.max(0, count - 1));
-  return games.sort((a, b) => new Date(b.gameCreationDate) - new Date(a.gameCreationDate));
+  return dedupeByGameId(games).sort((a, b) => new Date(b.gameCreationDate) - new Date(a.gameCreationDate));
 }
 
 /**
@@ -40,6 +49,14 @@ async function fetchRecentMatchSummaries(client, puuid, count = 20) {
  * przerywając, gdy trafi na mecz starszy niż `sinceDate` albo na pustą stronę
  * (koniec lokalnej historii klienta).
  *
+ * To niedokumentowane, lokalne API bywa niestabilne: czasem `begIndex`/
+ * `endIndex` są ignorowane i każde zapytanie zwraca tę samą, pierwszą stronę
+ * wyników. Żeby to wykryć zamiast wpaść w pętlę powielającą te same mecze aż
+ * do `maxPages`, każdy mecz jest odfiltrowywany po `gameId` względem już
+ * zebranych - gdy cała kolejna strona okaże się złożona wyłącznie z meczów
+ * widzianych wcześniej, przerywamy stronicowanie (`truncated: true` w
+ * wyniku sygnalizuje, że lista może nie sięgać żądanej daty).
+ *
  * Uwaga: to lokalny cache klienta League, nie serwerowa baza Riota - trzyma
  * ograniczoną liczbę ostatnich gier. Dla odległych dat lista może się urwać
  * wcześniej, niż faktyczna liczba rozegranych meczów by sugerowała, mimo że
@@ -48,26 +65,40 @@ async function fetchRecentMatchSummaries(client, puuid, count = 20) {
 async function fetchMatchSummariesSince(client, puuid, sinceDate, { pageSize = 20, maxPages = 100 } = {}) {
   const sinceTime = new Date(sinceDate).getTime();
   const collected = [];
+  const seenGameIds = new Set();
   let begIndex = 0;
+  let truncated = false;
 
   for (let page = 0; page < maxPages; page++) {
     const pageGames = await fetchGamePage(client, puuid, begIndex, begIndex + pageSize - 1);
     if (!pageGames.length) break;
 
     let reachedCutoff = false;
+    let newInThisPage = 0;
     for (const g of pageGames) {
       const created = new Date(g.gameCreationDate).getTime();
       if (Number.isFinite(created) && created < sinceTime) {
         reachedCutoff = true;
         break;
       }
+      if (seenGameIds.has(g.gameId)) continue;
+      seenGameIds.add(g.gameId);
       collected.push(g);
+      newInThisPage++;
+    }
+
+    if (newInThisPage === 0) {
+      truncated = true;
+      break;
     }
     if (reachedCutoff || pageGames.length < pageSize) break;
     begIndex += pageSize;
   }
 
-  return collected.sort((a, b) => new Date(b.gameCreationDate) - new Date(a.gameCreationDate));
+  return {
+    matches: collected.sort((a, b) => new Date(b.gameCreationDate) - new Date(a.gameCreationDate)),
+    truncated,
+  };
 }
 
 module.exports = { fetchRecentMatchSummaries, fetchMatchSummariesSince };

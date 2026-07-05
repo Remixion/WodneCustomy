@@ -117,6 +117,11 @@ async function loadHistoryList(fetchPromise, loadingLabel) {
   }
   tbody.innerHTML = '';
   statusEl.textContent = `Znaleziono ${result.matches.length} mecz(ów).`;
+  if (result.truncated) {
+    statusEl.textContent +=
+      ' Uwaga: klient League przestał zwracać nowe wyniki wcześniej, niż wynikałoby to z wybranej daty ' +
+      '(niestabilność tego lokalnego API) - lista może nie sięgać aż tak daleko wstecz.';
+  }
   if (!result.matches.length) {
     tbody.innerHTML = '<tr><td colspan="6">Brak meczów w lokalnej historii klienta.</td></tr>';
     return;

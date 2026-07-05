@@ -92,8 +92,13 @@ doimportowanie takiego meczu:
    tego dnia do teraz, zamiast stałej liczby ostatnich 20 - apka stronicuje
    wtedy historię klienta, aż trafi na mecz starszy niż wybrana data (albo na
    koniec lokalnej historii, jeśli klient nie trzyma już tak starych gier w
-   swoim cache). W obu przypadkach wystarczy kliknąć "Importuj" przy wybranym
-   meczu, żeby pobrać dokładnie te same, pełne dane co przy automatycznym
+   swoim cache). To niedokumentowane, lokalne API bywa niestabilne - czasem
+   ignoruje stronicowanie i zwraca w kółko tę samą stronę wyników; apka to
+   wykrywa (po powtarzających się identyfikatorach gier) i przerywa zamiast
+   zwrócić same duplikaty, pokazując ostrzeżenie, że lista może nie sięgać
+   aż tak daleko wstecz, jak wybrana data. W obu przypadkach wystarczy
+   kliknąć "Importuj" przy wybranym meczu, żeby pobrać dokładnie te same,
+   pełne dane co przy automatycznym
    przechwytywaniu. Wymaga uruchomionego i zalogowanego klienta League.
 2. **Import z plików .rofl** - w zakładce **Ustawienia** wpisz ścieżkę do
    folderu `Replays` klienta League (albo kliknij "Wykryj automatycznie"),
