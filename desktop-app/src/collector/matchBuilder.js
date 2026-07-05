@@ -35,6 +35,19 @@ async function buildMatchFromGameId(client, gameId, { includeEogStatsBlock = fal
 
   const champMap = await getChampionMap(client);
 
+  // eogStatsBlock (dostępny tylko przy żywym przechwytywaniu) zawiera pole
+  // "detectedTeamPosition" - znacznie dokładniejsze wykrycie roli gracza niż
+  // "timeline.lane" z /lol-match-history, które w customach często zwraca
+  // niepoprawne/puste wartości.
+  const eogPlayerByPuuid = {};
+  if (eogStatsBlock && Array.isArray(eogStatsBlock.teams)) {
+    eogStatsBlock.teams.forEach((team) => {
+      (team.players || []).forEach((eogPlayer) => {
+        if (eogPlayer.puuid) eogPlayerByPuuid[eogPlayer.puuid] = eogPlayer;
+      });
+    });
+  }
+
   const identityByParticipantId = {};
   (matchHistory.participantIdentities || []).forEach((pi) => {
     identityByParticipantId[pi.participantId] = pi.player || {};
@@ -93,6 +106,7 @@ async function buildMatchFromGameId(client, gameId, { includeEogStatsBlock = fal
       : identity.gameName
       ? `${identity.gameName}#${identity.tagLine || ''}`
       : '';
+    const eogPlayer = identity.puuid ? eogPlayerByPuuid[identity.puuid] : null;
 
     return {
       matchId: String(gameId),
@@ -101,7 +115,7 @@ async function buildMatchFromGameId(client, gameId, { includeEogStatsBlock = fal
       summonerName,
       championName: champMap[p.championId] || `#${p.championId}`,
       championId: p.championId,
-      teamPosition: (p.timeline && p.timeline.lane) || '',
+      teamPosition: (eogPlayer && eogPlayer.detectedTeamPosition) || (p.timeline && p.timeline.lane) || '',
       spell1: p.spell1Id,
       spell2: p.spell2Id,
       primaryRuneStyle: stats.perkPrimaryStyle || '',
