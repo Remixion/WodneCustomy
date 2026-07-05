@@ -114,6 +114,17 @@ doimportowanie takiego meczu:
    gry), można i tak zaimportować - zostanie zapisany tylko podstawowy,
    pusty wpis (identyfikator gry) do ręcznego uzupełnienia albo ponownej
    próby przez import z historii klienta.
+3. **Import ze starych plików JSON** - jeśli masz mecze zapisane wcześniej
+   jakimś innym/starszym narzędziem jako pliki `.json` (pełne statystyki, nie
+   pliki `.rofl`), w zakładce **Ustawienia** wpisz ścieżkę do folderu z tymi
+   plikami (albo kliknij "Wykryj automatycznie" - podpowie folder danych
+   apki, jeśli leżą tam luźne pliki `.json`), a w zakładce **Mecze**, sekcja
+   "Import ze starych plików JSON", kliknij "Wczytaj listę z folderu". Działa
+   tak samo jak import `.rofl` opisany wyżej (podgląd jednego meczu na raz w
+   panelu bocznym, przyciski "Importuj ten mecz" / "Zamknij podgląd", lista
+   z informacją, czy dany mecz jest już w bazie), ale ponieważ te pliki
+   zawierają już pełne dane meczu, import **nie wymaga uruchomionego klienta
+   League**.
 
 ### Budowanie pliku instalacyjnego (.exe / .dmg / .AppImage)
 

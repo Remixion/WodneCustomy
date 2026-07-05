@@ -5,6 +5,7 @@ const { GameWatcher } = require('./src/collector/gameWatcher');
 const { collectMatch, buildMatchFromGameId } = require('./src/collector/matchBuilder');
 const { fetchRecentMatchSummaries } = require('./src/collector/matchHistoryList');
 const { parseGameIdFromRoflFilename, detectDefaultReplaysFolder, listRoflFilesInFolder } = require('./src/collector/roflParser');
+const { detectDefaultLegacyJsonFolder, listLegacyJsonFilesInFolder, buildMatchFromLegacyJson, extractGameId } = require('./src/collector/legacyJsonParser');
 const { enrichPlayer } = require('./src/collector/playerProfile');
 const { LocalStore } = require('./src/storage/localStore');
 const { ConfigStore } = require('./src/config/configStore');
@@ -459,6 +460,71 @@ ipcMain.handle('rofl:import', async (_evt, filePaths) => {
       };
       store.saveMatch(match, []);
       results.push({ filePath, ok: true, matchId: gameId, full: false });
+    } catch (err) {
+      results.push({ filePath, ok: false, error: String(err) });
+    }
+  }
+  return results;
+});
+
+// ---- IPC: import ze starych plików JSON zapisanych kiedyś innym narzędziem ----
+ipcMain.handle('legacyjson:pick-files', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Wybierz plik JSON meczu',
+    filters: [{ name: 'Plik JSON meczu', extensions: ['json'] }],
+    properties: ['openFile'],
+  });
+  if (result.canceled) return [];
+  return result.filePaths;
+});
+
+ipcMain.handle('legacyjson:detect-default-folder', () => detectDefaultLegacyJsonFolder(configStore.getAll().dataDir));
+
+// Lista plików .json ze skonfigurowanego folderu (patrz Ustawienia) wraz z informacją,
+// czy dany mecz jest już zapisany lokalnie.
+ipcMain.handle('legacyjson:list-folder', () => {
+  const cfg = configStore.getAll();
+  if (!cfg.legacyJsonFolderPath) {
+    return { ok: false, error: 'Nie skonfigurowano folderu ze starymi plikami JSON (zakładka Ustawienia).' };
+  }
+  try {
+    const files = listLegacyJsonFilesInFolder(cfg.legacyJsonFolderPath);
+    const existingIds = new Set(store.listMatches().map((m) => String(m.match.matchId)));
+    return {
+      ok: true,
+      files: files.map((f) => ({ ...f, alreadyImported: f.gameId ? existingIds.has(f.gameId) : false })),
+    };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+});
+
+// Podgląd danych meczu przed zapisem - wyłącznie odczyt, nic nie zapisuje ani nie synchronizuje.
+ipcMain.handle('legacyjson:preview', (_evt, filePaths) => {
+  return filePaths.map((filePath) => {
+    try {
+      const raw = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      const gameId = extractGameId(raw, filePath);
+      const previousEogStatsBlock = getPreviousEogStatsBlock(gameId);
+      const { match, players } = buildMatchFromLegacyJson(raw, { gameId, previousEogStatsBlock });
+      return { filePath, gameId, ok: true, match, players };
+    } catch (err) {
+      return { filePath, ok: false, error: String(err) };
+    }
+  });
+});
+
+ipcMain.handle('legacyjson:import', async (_evt, filePaths) => {
+  const results = [];
+  for (const filePath of filePaths) {
+    try {
+      const raw = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      const gameId = extractGameId(raw, filePath);
+      const previousEogStatsBlock = getPreviousEogStatsBlock(gameId);
+      const { match, players } = buildMatchFromLegacyJson(raw, { gameId, previousEogStatsBlock });
+      const client = createOneOffLcuClient();
+      const result = await processCollectedMatch(client, { match, players });
+      results.push({ filePath, ok: true, matchId: result.match.matchId, full: true });
     } catch (err) {
       results.push({ filePath, ok: false, error: String(err) });
     }

@@ -107,6 +107,23 @@
           </p>
         </fieldset>
 
+        <fieldset>
+          <legend>Folder ze starymi plikami JSON meczów</legend>
+          <p>
+            <label for="legacyJsonFolderPath">Ścieżka do folderu ze starymi plikami JSON (zapisanymi kiedyś innym narzędziem)</label><br />
+            <input type="text" id="legacyJsonFolderPath" name="legacyJsonFolderPath" size="80" placeholder="np. C:\Users\Ty\Desktop\Custom Json" />
+            <button type="button" id="legacyjson-detect-folder-btn">Wykryj automatycznie</button>
+          </p>
+          <p>
+            Po ustawieniu tej ścieżki w zakładce <b>Mecze</b> pojawi się lista
+            wszystkich plików .json z tego folderu - będziesz mógł podejrzeć
+            dane każdego meczu i wybrać, które zaimportować do bazy. W
+            przeciwieństwie do importu .rofl / z historii klienta, te pliki
+            zawierają już pełne statystyki, więc import działa nawet bez
+            uruchomionego klienta League.
+          </p>
+        </fieldset>
+
         <p><button type="submit">Zapisz ustawienia</button></p>
       </form>
     </section>

@@ -248,4 +248,10 @@ async function collectMatch(client) {
   return buildMatchFromGameId(client, gameId, { includeEogStatsBlock: true });
 }
 
-module.exports = { collectMatch, buildMatchFromGameId };
+module.exports = {
+  collectMatch,
+  buildMatchFromGameId,
+  deriveTeamPosition,
+  normalizeTeamPosition,
+  resolveDuplicateJungles,
+};

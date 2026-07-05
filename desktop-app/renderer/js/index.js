@@ -356,6 +356,175 @@ document.getElementById('rofl-pick-btn').addEventListener('click', async () => {
   }
 });
 
+function renderLegacyJsonImportResults(results) {
+  const tbody = document.getElementById('legacyjson-import-tbody');
+  results.forEach((r) => {
+    const tr = document.createElement('tr');
+
+    const fileTd = document.createElement('td');
+    fileTd.textContent = fileBaseName(r.filePath);
+    tr.appendChild(fileTd);
+
+    const matchTd = document.createElement('td');
+    matchTd.textContent = r.matchId || '-';
+    tr.appendChild(matchTd);
+
+    const statusTd = document.createElement('td');
+    statusTd.textContent = r.ok ? 'zaimportowano' : `błąd - ${r.error}`;
+    tr.appendChild(statusTd);
+
+    const actionsTd = document.createElement('td');
+    if (r.ok && r.matchId) {
+      const pushBtn = document.createElement('button');
+      pushBtn.type = 'button';
+      pushBtn.textContent = 'Wyślij do Sheets';
+      pushBtn.addEventListener('click', async () => {
+        pushBtn.disabled = true;
+        const pushResult = await window.api.sync.pushMatch(r.matchId);
+        logEvent(`Wysłano mecz ${r.matchId} do Sheets: ${pushResult.ok ? 'OK' : 'błąd - ' + pushResult.error}`);
+        pushBtn.disabled = false;
+      });
+      actionsTd.appendChild(pushBtn);
+    }
+    tr.appendChild(actionsTd);
+
+    tbody.prepend(tr);
+  });
+}
+
+async function importOneLegacyJsonFile(filePath, card) {
+  card.querySelectorAll('button').forEach((b) => (b.disabled = true));
+  const results = await window.api.legacyJson.import([filePath]);
+  const r = results[0];
+  logEvent(
+    r.ok
+      ? `Import starego JSON (${r.matchId}): OK`
+      : `Import starego JSON błąd (${r.filePath}): ${r.error}`
+  );
+  renderLegacyJsonImportResults(results);
+  loadMatches();
+  if (document.getElementById('legacyjson-folder-tbody').children.length) loadLegacyJsonFolderList();
+  clearLegacyJsonPreview();
+}
+
+function clearLegacyJsonPreview() {
+  const container = document.getElementById('legacyjson-preview-container');
+  container.innerHTML = '<p>Kliknij „Podgląd” przy meczu z listy, aby zobaczyć tutaj jego dane.</p>';
+}
+
+/** Pokazuje podgląd JEDNEGO meczu na raz w panelu bocznym - zastępuje poprzedni podgląd. */
+function showLegacyJsonPreview(r) {
+  const container = document.getElementById('legacyjson-preview-container');
+  container.innerHTML = '';
+
+  const card = document.createElement('section');
+  const title = document.createElement('h4');
+  title.textContent = `${fileBaseName(r.filePath)}${r.gameId ? ' (Game ID: ' + r.gameId + ')' : ''}`;
+  card.appendChild(title);
+
+  if (r.ok) {
+    const dl = document.createElement('dl');
+    dl.innerHTML = `
+      <dt>Data</dt><dd>${formatDate(r.match.gameCreationDate)}</dd>
+      <dt>Tryb</dt><dd>${r.match.gameMode || ''}</dd>
+      <dt>Mapa</dt><dd>${r.match.mapId || ''}</dd>
+      <dt>Czas trwania</dt><dd>${formatDuration(r.match.gameDurationSec)}</dd>
+      <dt>Zwycięska drużyna</dt><dd>${r.match.winningTeam || ''}</dd>
+      <dt>Bany (niebiescy)</dt><dd>${r.match.blueBans || ''}</dd>
+      <dt>Bany (czerwoni)</dt><dd>${r.match.redBans || ''}</dd>
+    `;
+    card.appendChild(dl);
+    card.appendChild(renderPlayersPreviewTable(r.players));
+  } else {
+    const p = document.createElement('p');
+    p.textContent = `Podgląd niedostępny: ${r.error}`;
+    card.appendChild(p);
+  }
+
+  const actionsP = document.createElement('p');
+
+  const importBtn = document.createElement('button');
+  importBtn.type = 'button';
+  importBtn.textContent = r.ok ? 'Importuj ten mecz' : 'Importuj mimo to (bez podglądu)';
+  importBtn.addEventListener('click', () => importOneLegacyJsonFile(r.filePath, card));
+  actionsP.appendChild(importBtn);
+  actionsP.appendChild(document.createTextNode(' '));
+
+  const skipBtn = document.createElement('button');
+  skipBtn.type = 'button';
+  skipBtn.textContent = 'Zamknij podgląd';
+  skipBtn.addEventListener('click', clearLegacyJsonPreview);
+  actionsP.appendChild(skipBtn);
+
+  card.appendChild(actionsP);
+  container.appendChild(card);
+}
+
+async function loadLegacyJsonFolderList() {
+  const tbody = document.getElementById('legacyjson-folder-tbody');
+  const resultEl = document.getElementById('legacyjson-folder-result');
+  tbody.innerHTML = '<tr><td colspan="4">Wczytywanie listy plików...</td></tr>';
+  const result = await window.api.legacyJson.listFolder();
+  if (!result.ok) {
+    tbody.innerHTML = '';
+    resultEl.textContent = `Błąd: ${result.error}`;
+    return;
+  }
+  resultEl.textContent = `Znaleziono ${result.files.length} plik(ów) .json.`;
+  tbody.innerHTML = '';
+  if (!result.files.length) {
+    tbody.innerHTML = '<tr><td colspan="4">Brak plików .json w skonfigurowanym folderze.</td></tr>';
+    return;
+  }
+  result.files.forEach((f) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${f.fileName}</td>
+      <td>${f.gameId || '-'}</td>
+      <td>${f.alreadyImported ? 'Tak' : 'Nie'}</td>
+    `;
+    const actionsTd = document.createElement('td');
+    const previewBtn = document.createElement('button');
+    previewBtn.type = 'button';
+    previewBtn.textContent = 'Podgląd';
+    previewBtn.addEventListener('click', async () => {
+      previewBtn.disabled = true;
+      previewBtn.textContent = 'Wczytywanie...';
+      try {
+        const previewResults = await window.api.legacyJson.preview([f.filePath]);
+        showLegacyJsonPreview(previewResults[0]);
+      } finally {
+        previewBtn.disabled = false;
+        previewBtn.textContent = 'Podgląd';
+      }
+    });
+    actionsTd.appendChild(previewBtn);
+    tr.appendChild(actionsTd);
+    tbody.appendChild(tr);
+  });
+}
+
+document.getElementById('legacyjson-scan-folder-btn').addEventListener('click', loadLegacyJsonFolderList);
+
+document.getElementById('legacyjson-pick-btn').addEventListener('click', async () => {
+  const resultEl = document.getElementById('legacyjson-import-result');
+  const pickBtn = document.getElementById('legacyjson-pick-btn');
+  const filePaths = await window.api.legacyJson.pickFiles();
+  if (!filePaths.length) return;
+  pickBtn.disabled = true;
+  resultEl.textContent = 'Wczytywanie podglądu...';
+  try {
+    const previewResults = await window.api.legacyJson.preview(filePaths);
+    resultEl.textContent = previewResults[0].ok ? 'Podgląd gotowy - sprawdź panel po prawej.' : 'Podgląd niedostępny - sprawdź panel po prawej.';
+    showLegacyJsonPreview(previewResults[0]);
+  } catch (err) {
+    resultEl.textContent = `Błąd podglądu: ${err.message}`;
+    logEvent(`Podgląd starego JSON błąd: ${err.message}`);
+  } finally {
+    pickBtn.disabled = false;
+  }
+});
+
 window.api.lcu.onStatus(applyLcuStatus);
 window.api.collector.onStatus((s) => {
   document.getElementById('collector-status').textContent = s.collecting ? 'zbieranie danych zakończonego meczu...' : 'bezczynny';

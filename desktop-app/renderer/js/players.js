@@ -129,4 +129,28 @@ document.getElementById('push-all-btn').addEventListener('click', async () => {
   logEvent(`Wysłano graczy do Google Sheets: ${result.ok ? 'OK' : 'błąd - ' + result.error}`);
 });
 
+/** Gracze, których puuid nie występuje w żadnym lokalnie zapisanym meczu ("Rozegrane custom gry: 0" w Profilu). */
+document.getElementById('cleanup-zero-games-btn').addEventListener('click', async () => {
+  const players = await window.api.store.listPlayers();
+  const storedMatches = await window.api.store.listMatches();
+  const puuidsWithGames = new Set();
+  storedMatches.forEach((m) => (m.players || []).forEach((p) => { if (p.puuid) puuidsWithGames.add(p.puuid); }));
+
+  const ghosts = players.filter((p) => p.puuid && !puuidsWithGames.has(p.puuid));
+  if (!ghosts.length) {
+    logEvent('Brak graczy bez rozegranych meczów.');
+    return;
+  }
+
+  const names = ghosts.map((p) => p.nick || p.summonerName || p.puuid).join(', ');
+  if (!confirm(`Usunąć ${ghosts.length} gracz(y) bez rozegranych meczów (lokalnie i z Arkusza Google): ${names}?`)) return;
+
+  for (const p of ghosts) {
+    await window.api.store.deletePlayer(p.puuid);
+    const result = await window.api.sync.deletePlayer(p.puuid);
+    logEvent(`Usunięto gracza ${p.nick || p.summonerName || p.puuid}: lokalnie OK, Sheets ${result.ok ? 'OK' : 'błąd - ' + result.error}`);
+  }
+  loadPlayers();
+});
+
 loadPlayers();

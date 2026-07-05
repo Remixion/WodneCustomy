@@ -43,6 +43,13 @@ contextBridge.exposeInMainWorld('api', {
     listFolder: () => ipcRenderer.invoke('rofl:list-folder'),
     detectDefaultFolder: () => ipcRenderer.invoke('rofl:detect-default-folder'),
   },
+  legacyJson: {
+    pickFiles: () => ipcRenderer.invoke('legacyjson:pick-files'),
+    preview: (filePaths) => ipcRenderer.invoke('legacyjson:preview', filePaths),
+    import: (filePaths) => ipcRenderer.invoke('legacyjson:import', filePaths),
+    listFolder: () => ipcRenderer.invoke('legacyjson:list-folder'),
+    detectDefaultFolder: () => ipcRenderer.invoke('legacyjson:detect-default-folder'),
+  },
   collector: {
     onStatus: (cb) => ipcRenderer.on('collector:status', (_evt, data) => cb(data)),
     onMatchSaved: (cb) => ipcRenderer.on('collector:match-saved', (_evt, data) => cb(data)),

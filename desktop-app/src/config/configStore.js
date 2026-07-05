@@ -15,6 +15,7 @@ class ConfigStore {
       discordBotToken: '',
       discordGuildId: '',
       roflFolderPath: '',
+      legacyJsonFolderPath: '',
     };
     this.data = this.load();
   }

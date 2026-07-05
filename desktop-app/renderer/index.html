@@ -141,6 +141,64 @@
       </table>
     </section>
 
+    <section id="legacyjson-import-section">
+      <h2>Import ze starych plików JSON</h2>
+      <p>
+        Pozwala doimportować mecze zapisane kiedyś jako pliki .json innym
+        narzędziem (poza tą apką). Te pliki zawierają już pełne statystyki,
+        więc import działa nawet bez uruchomionego klienta League. Przed
+        zapisem zobaczysz podgląd danych meczu i będziesz mógł zdecydować,
+        czy go zaimportować.
+      </p>
+
+      <table id="legacyjson-layout-table" border="1">
+        <tr>
+          <td width="55%" valign="top">
+            <h3>Z folderu skonfigurowanego w Ustawieniach</h3>
+            <p>
+              <button id="legacyjson-scan-folder-btn" type="button">Wczytaj listę z folderu</button>
+              <span id="legacyjson-folder-result"></span>
+            </p>
+            <table id="legacyjson-folder-table" border="1">
+              <thead>
+                <tr>
+                  <th>Plik</th>
+                  <th>Game ID</th>
+                  <th>W bazie?</th>
+                  <th>Akcje</th>
+                </tr>
+              </thead>
+              <tbody id="legacyjson-folder-tbody"></tbody>
+            </table>
+
+            <h3>Wybierz plik ręcznie</h3>
+            <p>
+              <button id="legacyjson-pick-btn" type="button">Wybierz plik .json</button>
+              <span id="legacyjson-import-result"></span>
+            </p>
+          </td>
+          <td width="45%" valign="top">
+            <h3>Podgląd wybranego meczu</h3>
+            <section id="legacyjson-preview-container">
+              <p>Kliknij „Podgląd” przy meczu z listy, aby zobaczyć tutaj jego dane.</p>
+            </section>
+          </td>
+        </tr>
+      </table>
+
+      <table id="legacyjson-import-table" border="1">
+        <thead>
+          <tr>
+            <th>Plik</th>
+            <th>Mecz</th>
+            <th>Wynik importu</th>
+            <th>Akcje</th>
+          </tr>
+        </thead>
+        <tbody id="legacyjson-import-tbody"></tbody>
+      </table>
+    </section>
+
     <section id="log-section">
       <h2>Dziennik zdarzeń</h2>
       <ul id="log-list"></ul>
