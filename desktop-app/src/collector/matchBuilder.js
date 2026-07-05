@@ -9,6 +9,13 @@ function computeKda(k, d, a) {
   return ((k + a) / d).toFixed(2);
 }
 
+/** Ucina pełny numer wersji klienta (np. "15.24.734.7485") do samego patcha ("15.24"). */
+function toPatchVersion(version) {
+  if (!version) return '';
+  const parts = String(version).split('.');
+  return parts.length >= 2 ? `${parts[0]}.${parts[1]}` : String(version);
+}
+
 /**
  * Odtwarza rolę gracza z pary timeline.lane + timeline.role (fallback, gdy
  * eogStatsBlock/detectedTeamPosition nie jest dostępny - czyli przy imporcie
@@ -153,7 +160,7 @@ async function buildMatchFromGameId(
     gameType: matchHistory.gameType,
     mapId: matchHistory.mapId,
     queueId: matchHistory.queueId,
-    gameVersion: matchHistory.gameVersion,
+    gameVersion: toPatchVersion(matchHistory.gameVersion),
     winningTeam,
     blueBans: bansToNames(blueTeam),
     redBans: bansToNames(redTeam),
@@ -259,4 +266,5 @@ module.exports = {
   deriveTeamPosition,
   normalizeTeamPosition,
   resolveDuplicateJungles,
+  toPatchVersion,
 };

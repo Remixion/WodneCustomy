@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { normalizeTeamPosition, resolveDuplicateJungles } = require('./matchBuilder');
+const { normalizeTeamPosition, resolveDuplicateJungles, toPatchVersion } = require('./matchBuilder');
 
 function teamLabel(teamId) {
   return teamId === 100 ? 'BLUE' : teamId === 200 ? 'RED' : String(teamId);
@@ -200,7 +200,7 @@ function buildMatchFromLegacyJson(raw, { gameId, previousEogStatsBlock = null, d
     gameType: raw.gameType || '',
     mapId: raw.mapId || '',
     queueId: raw.queueId || '',
-    gameVersion: raw.gameVersion || '',
+    gameVersion: toPatchVersion(raw.gameVersion),
     winningTeam,
     blueBans: bansToNames(blueTeam),
     redBans: bansToNames(redTeam),
