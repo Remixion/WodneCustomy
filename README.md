@@ -174,6 +174,13 @@ doimportowanie takiego meczu:
    zawierają już pełne dane meczu, import **nie wymaga uruchomionego klienta
    League**.
 
+   Jeśli plik nie zawiera wiarygodnego `gameId`/`matchId` (bywa dosłownie
+   stringiem `"Unknown"`), apka nadaje syntetyczne ID w formacie
+   `legacy-<sekundy_unixa>-<hash>` na bazie znanej daty gry (albo daty
+   modyfikacji pliku, jeśli plik jej nie ma) - dzięki temu starszy mecz zawsze
+   dostaje mniejsze ID niż nowszy i sortowanie kolumny `matchId` w Arkuszu
+   odtwarza kolejność chronologiczną, mimo braku prawdziwego ID z Riota.
+
 ### Budowanie pliku instalacyjnego (.exe / .dmg / .AppImage)
 
 ```bash

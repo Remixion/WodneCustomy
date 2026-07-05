@@ -52,17 +52,27 @@ function detectDefaultLegacyJsonFolder(dataDir) {
 /**
  * Pliki z tego starego narzędzia bywają zapisane bez wiarygodnego identyfikatora
  * gry - pole "gameId"/"matchId" bywa dosłownie stringiem "Unknown" (potwierdzone
- * na realnym pliku). W takim wypadku budujemy stabilne ID z zawartości pliku
- * (hash SHA-1), żeby ten sam plik zawsze mapował się na ten sam mecz, a różne
- * pliki bez ID się ze sobą nie zlały w jeden wiersz w arkuszu.
+ * na realnym pliku). W takim wypadku budujemy syntetyczne ID na bazie znanej
+ * daty gry (albo daty modyfikacji pliku, jeśli plik nie ma własnej daty) -
+ * zamiast nieuporządkowanego hasha z całej zawartości. Data trafia na
+ * początek ID jako sekundy Unixa (10 cyfr aż do roku 2286, więc porównanie
+ * ID jako zwykłych stringów odpowiada porównaniu dat), dzięki czemu starszy
+ * mecz zawsze dostaje mniejsze ID niż nowszy - w Arkuszu wystarczy posortować
+ * kolumnę `matchId`, żeby odtworzyć kolejność chronologiczną, mimo braku
+ * prawdziwego gameId z Riota. Krótki hash na końcu to tylko zabezpieczenie
+ * przed zlaniem się dwóch meczów z tą samą sekundą w jeden wiersz - nie
+ * wpływa na kolejność sortowania (liczy się wyłącznie jako remis).
  */
 function extractGameId(raw, filePath) {
   const value = pick(raw, 'gameId', 'matchId');
   if (value !== undefined && String(value).trim().toLowerCase() !== 'unknown') {
     return String(value);
   }
-  const hash = crypto.createHash('sha1').update(fs.readFileSync(filePath)).digest('hex').slice(0, 12);
-  return `legacy-${hash}`;
+  const dateValue = pick(raw, 'date', 'gameCreation');
+  const timestampMs = dateValue ? new Date(dateValue).getTime() : NaN;
+  const seconds = Number.isFinite(timestampMs) ? Math.floor(timestampMs / 1000) : Math.floor(fs.statSync(filePath).mtime.getTime() / 1000);
+  const hash = crypto.createHash('sha1').update(fs.readFileSync(filePath)).digest('hex').slice(0, 6);
+  return `legacy-${seconds}-${hash}`;
 }
 
 /** Listuje pliki .json w podanym folderze (bez podfolderów), odczytując gameId z zawartości pliku. */
