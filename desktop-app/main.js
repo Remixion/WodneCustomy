@@ -335,6 +335,30 @@ ipcMain.handle('rofl:pick-files', async () => {
   return result.filePaths;
 });
 
+// Podgląd danych meczu przed zapisem - wyłącznie odczyt, nic nie zapisuje ani nie synchronizuje.
+ipcMain.handle('rofl:preview', async (_evt, filePaths) => {
+  const results = [];
+  for (const filePath of filePaths) {
+    const gameId = parseGameIdFromRoflFilename(filePath);
+    if (!gameId) {
+      results.push({ filePath, ok: false, error: 'Nie udało się odczytać identyfikatora gry z nazwy pliku (oczekiwano np. "EUN1-1234567890.rofl").' });
+      continue;
+    }
+    const client = createOneOffLcuClient();
+    if (!client) {
+      results.push({ filePath, gameId, ok: false, error: 'Klient League of Legends nie jest uruchomiony - podgląd niedostępny.' });
+      continue;
+    }
+    try {
+      const { match, players } = await buildMatchFromGameId(client, gameId, { includeEogStatsBlock: false });
+      results.push({ filePath, gameId, ok: true, match, players });
+    } catch (err) {
+      results.push({ filePath, gameId, ok: false, error: String(err) });
+    }
+  }
+  return results;
+});
+
 ipcMain.handle('rofl:import', async (_evt, filePaths) => {
   const results = [];
   for (const filePath of filePaths) {

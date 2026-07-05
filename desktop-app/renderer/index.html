@@ -88,14 +88,17 @@
         Uwaga: sam plik .rofl od patcha 13.20 nie zawiera już szczegółowych
         statystyk (to znany, niezałatany problem po stronie Riota). Import
         korzysta z identyfikatora gry zawartego w nazwie pliku i pobiera
-        pełne dane przez klienta League (tak jak wyżej) - jeśli to się nie
-        uda (np. inne konto zalogowane), zapisany zostanie tylko podstawowy,
-        pusty wpis do uzupełnienia ręcznie.
+        pełne dane przez klienta League (tak jak wyżej). Przed zapisem
+        zobaczysz podgląd danych meczu i będziesz mógł zdecydować, czy go
+        zaimportować.
       </p>
       <p>
         <button id="rofl-pick-btn" type="button">Wybierz plik(i) .rofl</button>
         <span id="rofl-import-result"></span>
       </p>
+
+      <section id="rofl-preview-container"></section>
+
       <table id="rofl-import-table" border="1">
         <thead>
           <tr>

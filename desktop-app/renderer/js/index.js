@@ -201,33 +201,107 @@ function renderRoflImportResults(results) {
   });
 }
 
+async function importOneRoflFile(filePath, card) {
+  card.querySelectorAll('button').forEach((b) => (b.disabled = true));
+  const results = await window.api.rofl.import([filePath]);
+  const r = results[0];
+  logEvent(
+    r.ok
+      ? `Import .rofl (${r.matchId}): ${r.full ? 'pełne dane' : 'tylko podstawowy wpis'}`
+      : `Import .rofl błąd (${r.filePath}): ${r.error}`
+  );
+  renderRoflImportResults(results);
+  loadMatches();
+  card.remove();
+}
+
+function renderPlayersPreviewTable(players) {
+  const table = document.createElement('table');
+  table.setAttribute('border', '1');
+  const thead = document.createElement('thead');
+  thead.innerHTML = '<tr><th>Drużyna</th><th>Gracz</th><th>Champion</th><th>K/D/A</th><th>KDA</th><th>Wynik</th></tr>';
+  table.appendChild(thead);
+  const tbody = document.createElement('tbody');
+  (players || []).forEach((p) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${p.team || ''}</td>
+      <td>${p.summonerName || ''}</td>
+      <td>${p.championName || ''}</td>
+      <td>${p.kills}/${p.deaths}/${p.assists}</td>
+      <td>${p.kda || ''}</td>
+      <td>${p.win ? 'Wygrana' : 'Przegrana'}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  return table;
+}
+
+function renderRoflPreview(previewResults) {
+  const container = document.getElementById('rofl-preview-container');
+  previewResults.forEach((r) => {
+    const card = document.createElement('section');
+    const title = document.createElement('h3');
+    title.textContent = `${fileBaseName(r.filePath)}${r.gameId ? ' (Game ID: ' + r.gameId + ')' : ''}`;
+    card.appendChild(title);
+
+    if (r.ok) {
+      const dl = document.createElement('dl');
+      dl.innerHTML = `
+        <dt>Data</dt><dd>${formatDate(r.match.gameCreationDate)}</dd>
+        <dt>Tryb</dt><dd>${r.match.gameMode || ''}</dd>
+        <dt>Mapa</dt><dd>${r.match.mapId || ''}</dd>
+        <dt>Czas trwania</dt><dd>${formatDuration(r.match.gameDurationSec)}</dd>
+        <dt>Zwycięska drużyna</dt><dd>${r.match.winningTeam || ''}</dd>
+        <dt>Bany (niebiescy)</dt><dd>${r.match.blueBans || ''}</dd>
+        <dt>Bany (czerwoni)</dt><dd>${r.match.redBans || ''}</dd>
+      `;
+      card.appendChild(dl);
+      card.appendChild(renderPlayersPreviewTable(r.players));
+    } else {
+      const p = document.createElement('p');
+      p.textContent = `Podgląd niedostępny: ${r.error}`;
+      card.appendChild(p);
+    }
+
+    const actionsP = document.createElement('p');
+
+    const importBtn = document.createElement('button');
+    importBtn.type = 'button';
+    importBtn.textContent = r.ok ? 'Importuj ten mecz' : 'Importuj mimo to (bez podglądu)';
+    importBtn.addEventListener('click', () => importOneRoflFile(r.filePath, card));
+    actionsP.appendChild(importBtn);
+    actionsP.appendChild(document.createTextNode(' '));
+
+    const skipBtn = document.createElement('button');
+    skipBtn.type = 'button';
+    skipBtn.textContent = 'Pomiń';
+    skipBtn.addEventListener('click', () => card.remove());
+    actionsP.appendChild(skipBtn);
+
+    card.appendChild(actionsP);
+    container.appendChild(card);
+  });
+}
+
 document.getElementById('rofl-pick-btn').addEventListener('click', async () => {
   const resultEl = document.getElementById('rofl-import-result');
   const pickBtn = document.getElementById('rofl-pick-btn');
   const filePaths = await window.api.rofl.pickFiles();
   if (!filePaths.length) return;
   pickBtn.disabled = true;
-  resultEl.textContent = `Importowanie ${filePaths.length} plik(ów) - może to potrwać dłużej dla starszych meczów...`;
+  resultEl.textContent = `Wczytywanie podglądu dla ${filePaths.length} plik(ów)...`;
   try {
-    const results = await window.api.rofl.import(filePaths);
-    const okFull = results.filter((r) => r.ok && r.full).length;
-    const okPartial = results.filter((r) => r.ok && !r.full).length;
-    const failed = results.filter((r) => !r.ok).length;
-    resultEl.textContent = `Zaimportowano: ${okFull} z pełnymi danymi, ${okPartial} tylko podstawowo, błędów: ${failed}`;
-    renderRoflImportResults(results);
-    results.forEach((r) => {
-      logEvent(
-        r.ok
-          ? `Import .rofl (${r.matchId}): ${r.full ? 'pełne dane' : 'tylko podstawowy wpis'}`
-          : `Import .rofl błąd (${r.filePath}): ${r.error}`
-      );
-    });
+    const previewResults = await window.api.rofl.preview(filePaths);
+    const okCount = previewResults.filter((r) => r.ok).length;
+    resultEl.textContent = `Podgląd gotowy: ${okCount}/${previewResults.length}. Sprawdź poniżej i potwierdź import.`;
+    renderRoflPreview(previewResults);
   } catch (err) {
-    resultEl.textContent = `Błąd importu: ${err.message}`;
-    logEvent(`Import .rofl błąd: ${err.message}`);
+    resultEl.textContent = `Błąd podglądu: ${err.message}`;
+    logEvent(`Podgląd .rofl błąd: ${err.message}`);
   } finally {
     pickBtn.disabled = false;
-    loadMatches();
   }
 });
 

@@ -38,6 +38,7 @@ contextBridge.exposeInMainWorld('api', {
   },
   rofl: {
     pickFiles: () => ipcRenderer.invoke('rofl:pick-files'),
+    preview: (filePaths) => ipcRenderer.invoke('rofl:preview', filePaths),
     import: (filePaths) => ipcRenderer.invoke('rofl:import', filePaths),
   },
   collector: {
