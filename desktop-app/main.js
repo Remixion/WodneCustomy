@@ -327,9 +327,9 @@ ipcMain.handle('history:import-match', async (_evt, gameId) => {
 // ---- IPC: import z plików .rofl (patrz komentarz w roflParser.js o ograniczeniach) ----
 ipcMain.handle('rofl:pick-files', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
-    title: 'Wybierz plik(i) .rofl',
+    title: 'Wybierz plik .rofl',
     filters: [{ name: 'League of Legends Replay', extensions: ['rofl'] }],
-    properties: ['openFile', 'multiSelections'],
+    properties: ['openFile'],
   });
   if (result.canceled) return [];
   return result.filePaths;

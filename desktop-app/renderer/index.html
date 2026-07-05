@@ -93,30 +93,40 @@
         zaimportować.
       </p>
 
-      <h3>Z folderu Replays (skonfigurowanego w Ustawieniach)</h3>
-      <p>
-        <button id="rofl-scan-folder-btn" type="button">Wczytaj listę z folderu</button>
-        <span id="rofl-folder-result"></span>
-      </p>
-      <table id="rofl-folder-table" border="1">
-        <thead>
-          <tr>
-            <th>Plik</th>
-            <th>Game ID</th>
-            <th>W bazie?</th>
-            <th>Akcje</th>
-          </tr>
-        </thead>
-        <tbody id="rofl-folder-tbody"></tbody>
+      <table id="rofl-layout-table" border="1">
+        <tr>
+          <td width="55%" valign="top">
+            <h3>Z folderu Replays (skonfigurowanego w Ustawieniach)</h3>
+            <p>
+              <button id="rofl-scan-folder-btn" type="button">Wczytaj listę z folderu</button>
+              <span id="rofl-folder-result"></span>
+            </p>
+            <table id="rofl-folder-table" border="1">
+              <thead>
+                <tr>
+                  <th>Plik</th>
+                  <th>Game ID</th>
+                  <th>W bazie?</th>
+                  <th>Akcje</th>
+                </tr>
+              </thead>
+              <tbody id="rofl-folder-tbody"></tbody>
+            </table>
+
+            <h3>Wybierz plik ręcznie</h3>
+            <p>
+              <button id="rofl-pick-btn" type="button">Wybierz plik .rofl</button>
+              <span id="rofl-import-result"></span>
+            </p>
+          </td>
+          <td width="45%" valign="top">
+            <h3>Podgląd wybranego meczu</h3>
+            <section id="rofl-preview-container">
+              <p>Kliknij „Podgląd” przy meczu z listy, aby zobaczyć tutaj jego dane.</p>
+            </section>
+          </td>
+        </tr>
       </table>
-
-      <h3>Wybierz plik(i) ręcznie</h3>
-      <p>
-        <button id="rofl-pick-btn" type="button">Wybierz plik(i) .rofl</button>
-        <span id="rofl-import-result"></span>
-      </p>
-
-      <section id="rofl-preview-container"></section>
 
       <table id="rofl-import-table" border="1">
         <thead>
