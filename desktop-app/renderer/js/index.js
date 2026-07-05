@@ -120,31 +120,30 @@ async function loadHistoryList() {
   result.matches.forEach((m) => {
     const tr = document.createElement('tr');
     const actionsTd = document.createElement('td');
+
     if (m.alreadyImported) {
-      actionsTd.textContent = 'już zaimportowany';
-    } else {
-      const importBtn = document.createElement('button');
-      importBtn.type = 'button';
-      importBtn.textContent = 'Importuj';
-      importBtn.addEventListener('click', async () => {
-        importBtn.disabled = true;
-        importBtn.textContent = 'Importowanie...';
-        try {
-          const importResult = await window.api.history.importMatch(m.gameId);
-          logEvent(`Import meczu ${m.gameId}: ${importResult.ok ? 'OK' : 'błąd - ' + importResult.error}`);
-          if (importResult.ok) {
-            loadHistoryList();
-          }
-        } catch (err) {
-          logEvent(`Import meczu ${m.gameId}: błąd - ${err.message}`);
-        } finally {
-          importBtn.disabled = false;
-          importBtn.textContent = 'Importuj';
-          loadMatches();
-        }
-      });
-      actionsTd.appendChild(importBtn);
+      const label = document.createElement('span');
+      label.textContent = 'już zaimportowany - ';
+      actionsTd.appendChild(label);
     }
+
+    const importBtn = document.createElement('button');
+    importBtn.type = 'button';
+    importBtn.textContent = m.alreadyImported ? 'Importuj ponownie' : 'Importuj';
+    importBtn.addEventListener('click', async () => {
+      importBtn.disabled = true;
+      importBtn.textContent = 'Importowanie...';
+      try {
+        const importResult = await window.api.history.importMatch(m.gameId);
+        logEvent(`Import meczu ${m.gameId}: ${importResult.ok ? 'OK' : 'błąd - ' + importResult.error}`);
+      } catch (err) {
+        logEvent(`Import meczu ${m.gameId}: błąd - ${err.message}`);
+      } finally {
+        loadMatches();
+        loadHistoryList();
+      }
+    });
+    actionsTd.appendChild(importBtn);
 
     tr.innerHTML = `
       <td>${m.gameId}</td>
