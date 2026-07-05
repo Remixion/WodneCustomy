@@ -41,6 +41,7 @@
         <thead>
           <tr>
             <th>Game ID</th>
+            <th>Źródło danych</th>
             <th>Data</th>
             <th>Tryb</th>
             <th>Mapa</th>
@@ -53,7 +54,7 @@
           </tr>
         </thead>
         <tbody id="matches-tbody">
-          <tr><td colspan="10">Wczytywanie...</td></tr>
+          <tr><td colspan="11">Wczytywanie...</td></tr>
         </tbody>
       </table>
     </section>
@@ -85,12 +86,13 @@
     <section id="rofl-import-section">
       <h2>Import z plików .rofl</h2>
       <p>
-        Uwaga: sam plik .rofl od patcha 13.20 nie zawiera już szczegółowych
-        statystyk (to znany, niezałatany problem po stronie Riota). Import
-        korzysta z identyfikatora gry zawartego w nazwie pliku i pobiera
-        pełne dane przez klienta League (tak jak wyżej). Przed zapisem
-        zobaczysz podgląd danych meczu i będziesz mógł zdecydować, czy go
-        zaimportować.
+        Import próbuje najpierw historii klienta League po identyfikatorze
+        gry z nazwy pliku (pełniejszy kształt danych - osobne bany
+        drużynowe), a jeśli to się nie uda (np. zalogowane konto nie brało
+        udziału w tej grze), sięga po statystyki graczy zaszyte wprost w
+        samym pliku .rofl. Kolumna "Źródło danych" w tabeli meczów pokazuje,
+        której metody ostatecznie użyto. Przed zapisem zobaczysz podgląd
+        danych meczu i będziesz mógł zdecydować, czy go zaimportować.
       </p>
 
       <table id="rofl-layout-table" border="1">

@@ -98,22 +98,31 @@ doimportowanie takiego meczu:
    z informacją, czy dany mecz jest już w bazie. Dla pojedynczych plików
    spoza tego folderu wciąż można użyć "Wybierz plik(i) .rofl".
 
-   Uwaga: sam plik `.rofl` **od patcha 13.20 nie zawiera już szczegółowych
-   statystyk graczy** - to potwierdzony, zgłoszony i nigdy niezałatany błąd
-   po stronie Riota ([RiotGames/developer-relations#831](https://github.com/RiotGames/developer-relations/issues/831)).
-   Dlatego import korzysta z identyfikatora gry zawartego w nazwie pliku
-   (np. `EUN1-3880767863.rofl`) i pobiera pełne dane tym samym sposobem co
-   punkt 1 powyżej - o ile klient League jest uruchomiony i ma dostęp do
-   historii tej gry.
+   Import próbuje po kolei dwóch źródeł danych:
+   - **historia klienta League** - po identyfikatorze gry zawartym w nazwie
+     pliku (np. `EUN1-3880767863.rofl`), tym samym sposobem co punkt 1
+     powyżej. Daje pełniejszy kształt danych (osobne bany drużynowe), ale
+     wymaga uruchomionego klienta League **z kontem, które brało udział
+     w tej konkretnej grze** - dla nagrań cudzych meczów (np. hostujesz albo
+     tylko obserwujesz customy) ten krok się nie uda.
+   - **statystyki zaszyte w samym pliku .rofl** - wcześniej zakładaliśmy, że
+     Riot usunął je z plików od patcha 13.20 ([RiotGames/developer-relations#831](https://github.com/RiotGames/developer-relations/issues/831)),
+     ale w praktyce bywają nadal obecne (zależy od wersji klienta) - gdy
+     historia klienta zawiedzie, apka próbuje odczytać je bezpośrednio z
+     pliku, bez potrzeby posiadania dostępu do historii tej gry.
+
+   Kolumna **"Źródło danych"** przy każdym meczu (w tabeli i w szczegółach)
+   pokazuje, z której z tych dwóch metod (albo z automatycznego
+   przechwytywania na żywo / starego pliku JSON / pustego wpisu zapasowego)
+   faktycznie pochodzą jego dane.
 
    Przed zapisem każdego meczu (z folderu albo wybranego ręcznie) apka
    pokazuje **podgląd** danych (podsumowanie meczu + statystyki graczy) -
    dopiero kliknięcie "Importuj ten mecz" faktycznie zapisuje dane i
-   synchronizuje je z Arkuszem; "Pomiń" odrzuca podgląd bez zapisu. Jeśli
-   podgląd się nie uda (np. klient League nie ma dostępu do historii danej
-   gry), można i tak zaimportować - zostanie zapisany tylko podstawowy,
-   pusty wpis (identyfikator gry) do ręcznego uzupełnienia albo ponownej
-   próby przez import z historii klienta.
+   synchronizuje je z Arkuszem; "Zamknij podgląd" odrzuca go bez zapisu.
+   Jeśli obie metody zawiodą, można i tak zaimportować - zostanie zapisany
+   tylko podstawowy, pusty wpis (identyfikator gry) do ręcznego uzupełnienia
+   albo ponownej próby później.
 3. **Import ze starych plików JSON** - jeśli masz mecze zapisane wcześniej
    jakimś innym/starszym narzędziem jako pliki `.json` (pełne statystyki, nie
    pliki `.rofl`), w zakładce **Ustawienia** wpisz ścieżkę do folderu z tymi
@@ -150,10 +159,11 @@ statyczny.
 
 Dane trafiają do trzech podarkuszy w Arkuszu Google:
 
-- **`Matches`** - jeden wiersz na mecz: data, tryb, mapa, kolejka, czas trwania,
-  zwycięska drużyna, składy banów, statystyki celów drużynowych (smoki, baron,
-  herald, wieże, inhibitory), notatki, oraz surowe dane JSON z LCU jako kopia
-  zapasowa (`rawDataJson`).
+- **`Matches`** - jeden wiersz na mecz: **źródło danych** (`dataSource` - patrz
+  niżej), data, tryb, mapa, kolejka, czas trwania, zwycięska drużyna, składy
+  banów, statystyki celów drużynowych (smoki, baron, herald, wieże,
+  inhibitory), notatki, oraz surowe dane JSON z LCU jako kopia zapasowa
+  (`rawDataJson`).
 - **`MatchPlayers`** - jeden wiersz na gracza w danym meczu: bohater, pozycja,
   przywoływacze, runy, poziom, KDA, CS, złoto, obrażenia, leczenie, vision
   score, wardy, przedmioty (0-6), pierwsza krew/wieża, wielokrotne zabójstwa,
@@ -173,6 +183,19 @@ Dane trafiają do trzech podarkuszy w Arkuszu Google:
 
 Ręcznie wpisane pola (`notes`, `nick`, `color`, `avatarSource`, `discordNick`)
 nigdy nie są nadpisywane przez automatyczną synchronizację danych z gry.
+
+### Źródło danych meczu (`dataSource`)
+
+Każdy mecz ma zapisane, skąd faktycznie pochodzą jego dane - widoczne jako
+kolumna "Źródło danych" w tabeli meczów i w szczegółach meczu:
+
+| Wartość | Znaczenie |
+| --- | --- |
+| `lcu-live` | Przechwycone automatycznie na żywo, zaraz po zakończeniu gry. |
+| `lcu-history` | Pobrane z lokalnej historii meczów klienta League (import z historii / `.rofl` po identyfikatorze gry). Wymaga, żeby zalogowane konto brało udział w tej grze. |
+| `rofl-stats` | Wyciągnięte bezpośrednio ze statystyk zaszytych w pliku `.rofl` - zapasowa metoda, gdy `lcu-history` się nie uda. |
+| `legacy-json` | Zaimportowane z pliku `.json` zapisanego kiedyś innym narzędziem. |
+| `placeholder` | Żadna z powyższych metod się nie powiodła - zapisano tylko identyfikator gry do ręcznego uzupełnienia albo ponownej próby importu. |
 
 ## Zakładka Statystyki
 

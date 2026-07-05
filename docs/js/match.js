@@ -42,6 +42,16 @@ async function load() {
 function renderMatchFields(match) {
   const tbody = document.querySelector('#match-fields-table tbody');
   tbody.innerHTML = '';
+
+  const sourceTr = document.createElement('tr');
+  const sourceTh = document.createElement('th');
+  sourceTh.textContent = 'Źródło danych (skąd pochodzi ten mecz, tylko do odczytu)';
+  const sourceTd = document.createElement('td');
+  sourceTd.textContent = formatDataSource(match.dataSource);
+  sourceTr.appendChild(sourceTh);
+  sourceTr.appendChild(sourceTd);
+  tbody.appendChild(sourceTr);
+
   MATCH_FIELDS.forEach((field) => {
     const tr = document.createElement('tr');
     const th = document.createElement('th');

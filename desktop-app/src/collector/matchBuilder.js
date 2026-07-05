@@ -90,7 +90,11 @@ function resolveDuplicateJungles(players) {
  * ponownie") nie pogorszył dokładności roli graczy tylko dlatego, że tym
  * razem eogStatsBlock nie jest dostępny na świeżo.
  */
-async function buildMatchFromGameId(client, gameId, { includeEogStatsBlock = false, previousEogStatsBlock = null } = {}) {
+async function buildMatchFromGameId(
+  client,
+  gameId,
+  { includeEogStatsBlock = false, previousEogStatsBlock = null, dataSource = 'lcu-history' } = {}
+) {
   const matchHistory = await client.get(`/lol-match-history/v1/games/${gameId}`);
 
   let eogStatsBlock = null;
@@ -142,6 +146,7 @@ async function buildMatchFromGameId(client, gameId, { includeEogStatsBlock = fal
 
   const match = {
     matchId: String(gameId),
+    dataSource,
     gameCreationDate: new Date(matchHistory.gameCreation).toISOString(),
     gameDurationSec: matchHistory.gameDuration,
     gameMode: matchHistory.gameMode,
@@ -245,7 +250,7 @@ async function collectMatch(client) {
   if (!gameId) {
     throw new Error('Nie udało się odczytać gameId zakończonej gry z sesji gameflow.');
   }
-  return buildMatchFromGameId(client, gameId, { includeEogStatsBlock: true });
+  return buildMatchFromGameId(client, gameId, { includeEogStatsBlock: true, dataSource: 'lcu-live' });
 }
 
 module.exports = {

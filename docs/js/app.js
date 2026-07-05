@@ -21,7 +21,7 @@ function renderMatches(matches) {
   const tbody = document.getElementById('matches-tbody');
   tbody.innerHTML = '';
   if (!matches.length) {
-    tbody.innerHTML = '<tr><td colspan="11">Brak zarejestrowanych meczów.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12">Brak zarejestrowanych meczów.</td></tr>';
     return;
   }
   const sorted = matches.slice().sort((a, b) => new Date(b.gameCreationDate) - new Date(a.gameCreationDate));
@@ -68,6 +68,7 @@ function renderMatches(matches) {
 
     tr.innerHTML = `
       <td>${match.matchId}</td>
+      <td>${formatDataSource(match.dataSource)}</td>
       <td>${formatDate(match.gameCreationDate)}</td>
       <td>${match.gameMode || ''}</td>
       <td>${match.mapId || ''}</td>

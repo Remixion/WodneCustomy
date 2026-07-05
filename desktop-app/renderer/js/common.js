@@ -27,6 +27,19 @@ function qs(name) {
   return new URLSearchParams(window.location.search).get(name);
 }
 
+/** Czytelna etykieta źródła danych meczu (patrz match.dataSource) - zobacz też komentarze w matchBuilder.js/legacyJsonParser.js/roflParser.js. */
+const DATA_SOURCE_LABELS = {
+  'lcu-live': 'Na żywo (koniec gry)',
+  'lcu-history': 'Historia klienta League',
+  'rofl-stats': 'Statystyki z pliku .rofl',
+  'legacy-json': 'Stary plik JSON',
+  placeholder: 'Brak danych (tylko ID)',
+};
+
+function formatDataSource(dataSource) {
+  return DATA_SOURCE_LABELS[dataSource] || dataSource || '-';
+}
+
 // ---- Statystyki pomocnicze (współdzielone przez stats.js / profile.js) ----
 
 function numberOr(value, fallback = 0) {

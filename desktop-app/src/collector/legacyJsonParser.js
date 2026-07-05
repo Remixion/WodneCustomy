@@ -115,8 +115,14 @@ function listLegacyJsonFilesInFolder(folderPath) {
  * (np. przez żywe przechwytywanie), wciąż wolimy jego detectedTeamPosition
  * (dokładniejsze niż to, co niesie ten plik), przekazane jako
  * previousEogStatsBlock - tak samo jak przy ponownym imporcie z historii/.rofl.
+ *
+ * "dataSource" trafia wprost do match.dataSource, żeby zawsze było widać w
+ * Arkuszu/aplikacji, skąd wzięły się dane tego meczu - domyślnie "legacy-json"
+ * (import pliku od użytkownika), ale wywołujący może nadpisać np. na
+ * "rofl-stats", gdy ten sam parser jest użyty do statystyk zaszytych w pliku
+ * .rofl (patrz roflParser.js).
  */
-function buildMatchFromLegacyJson(raw, { gameId, previousEogStatsBlock = null } = {}) {
+function buildMatchFromLegacyJson(raw, { gameId, previousEogStatsBlock = null, dataSource = 'legacy-json' } = {}) {
   const eogPlayerByPuuid = {};
   if (previousEogStatsBlock && Array.isArray(previousEogStatsBlock.teams)) {
     previousEogStatsBlock.teams.forEach((team) => {
@@ -177,6 +183,7 @@ function buildMatchFromLegacyJson(raw, { gameId, previousEogStatsBlock = null } 
 
   const match = {
     matchId: gameId,
+    dataSource,
     gameCreationDate,
     gameDurationSec,
     gameMode: pick(raw, 'gameMode', 'queueType') || '',

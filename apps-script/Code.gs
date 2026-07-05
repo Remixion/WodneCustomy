@@ -15,7 +15,7 @@ var SHEET_MATCH_PLAYERS = 'MatchPlayers';
 var SHEET_PLAYERS = 'Players';
 
 var MATCHES_HEADERS = [
-  'matchId', 'gameCreationDate', 'gameDurationSec', 'gameMode', 'gameType',
+  'matchId', 'dataSource', 'gameCreationDate', 'gameDurationSec', 'gameMode', 'gameType',
   'mapId', 'queueId', 'gameVersion', 'winningTeam',
   'blueBans', 'redBans',
   'blueBaronKills', 'blueDragonKills', 'blueHeraldKills', 'blueTowerKills', 'blueInhibKills',

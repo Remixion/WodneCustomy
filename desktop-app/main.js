@@ -4,7 +4,7 @@ const fs = require('fs');
 const { GameWatcher } = require('./src/collector/gameWatcher');
 const { collectMatch, buildMatchFromGameId } = require('./src/collector/matchBuilder');
 const { fetchRecentMatchSummaries } = require('./src/collector/matchHistoryList');
-const { parseGameIdFromRoflFilename, detectDefaultReplaysFolder, listRoflFilesInFolder } = require('./src/collector/roflParser');
+const { parseGameIdFromRoflFilename, detectDefaultReplaysFolder, listRoflFilesInFolder, extractEmbeddedStats } = require('./src/collector/roflParser');
 const { detectDefaultLegacyJsonFolder, listLegacyJsonFilesInFolder, buildMatchFromLegacyJson, extractGameId } = require('./src/collector/legacyJsonParser');
 const { enrichPlayer } = require('./src/collector/playerProfile');
 const { LocalStore } = require('./src/storage/localStore');
@@ -369,6 +369,48 @@ ipcMain.handle('rofl:list-folder', () => {
   }
 });
 
+/**
+ * Buduje mecz z pliku .rofl próbując po kolei: historię klienta League (pełniejszy
+ * kształt - osobne bany/cele drużynowe, ale wymaga, żeby zalogowane konto brało
+ * udział w tej grze), a w razie błędu - statystyki zaszyte wprost w pliku .rofl
+ * (patrz extractEmbeddedStats w roflParser.js). Zwraca też informację, której
+ * metody użyto (przydatne do komunikatu w UI), niezależnie od match.dataSource
+ * zapisanego w samych danych.
+ */
+async function buildMatchFromRoflFile(filePath, gameId) {
+  const client = createOneOffLcuClient();
+  if (client) {
+    try {
+      const previousEogStatsBlock = getPreviousEogStatsBlock(gameId);
+      const { match, players } = await buildMatchFromGameId(client, gameId, {
+        includeEogStatsBlock: false,
+        previousEogStatsBlock,
+        dataSource: 'lcu-history',
+      });
+      return { match, players, client };
+    } catch (err) {
+      // klient działa, ale nie ma dostępu do historii tej gry (np. zalogowane
+      // konto w niej nie grało) - spróbuj statystyk zaszytych w pliku poniżej
+    }
+  }
+
+  const embedded = extractEmbeddedStats(filePath);
+  if (embedded) {
+    const previousEogStatsBlock = getPreviousEogStatsBlock(gameId);
+    const { match, players } = buildMatchFromLegacyJson(
+      { gameId, gameLength: embedded.gameLength, participants: embedded.participants },
+      { gameId, previousEogStatsBlock, dataSource: 'rofl-stats' }
+    );
+    return { match, players, client };
+  }
+
+  throw new Error(
+    client
+      ? 'Klient League nie ma dostępu do historii tej gry (prawdopodobnie zalogowane konto w niej nie grało), a plik .rofl nie zawiera zapasowych statystyk graczy.'
+      : 'Klient League of Legends nie jest uruchomiony, a plik .rofl nie zawiera zapasowych statystyk graczy.'
+  );
+}
+
 // Podgląd danych meczu przed zapisem - wyłącznie odczyt, nic nie zapisuje ani nie synchronizuje.
 ipcMain.handle('rofl:preview', async (_evt, filePaths) => {
   const results = [];
@@ -378,14 +420,8 @@ ipcMain.handle('rofl:preview', async (_evt, filePaths) => {
       results.push({ filePath, ok: false, error: 'Nie udało się odczytać identyfikatora gry z nazwy pliku (oczekiwano np. "EUN1-1234567890.rofl").' });
       continue;
     }
-    const client = createOneOffLcuClient();
-    if (!client) {
-      results.push({ filePath, gameId, ok: false, error: 'Klient League of Legends nie jest uruchomiony - podgląd niedostępny.' });
-      continue;
-    }
     try {
-      const previousEogStatsBlock = getPreviousEogStatsBlock(gameId);
-      const { match, players } = await buildMatchFromGameId(client, gameId, { includeEogStatsBlock: false, previousEogStatsBlock });
+      const { match, players } = await buildMatchFromRoflFile(filePath, gameId);
       results.push({ filePath, gameId, ok: true, match, players });
     } catch (err) {
       results.push({ filePath, gameId, ok: false, error: String(err) });
@@ -403,28 +439,25 @@ ipcMain.handle('rofl:import', async (_evt, filePaths) => {
       continue;
     }
 
-    const client = createOneOffLcuClient();
-    if (client) {
-      try {
-        const previousEogStatsBlock = getPreviousEogStatsBlock(gameId);
-        const { match, players } = await buildMatchFromGameId(client, gameId, { includeEogStatsBlock: false, previousEogStatsBlock });
-        const result = await processCollectedMatch(client, { match, players });
-        results.push({ filePath, ok: true, matchId: result.match.matchId, full: true });
-        continue;
-      } catch (err) {
-        // klient działa, ale nie ma dostępu do historii tej gry - zapisz zapasowo minimalny wpis poniżej
-      }
+    try {
+      const { match, players, client } = await buildMatchFromRoflFile(filePath, gameId);
+      const result = await processCollectedMatch(client, { match, players });
+      results.push({ filePath, ok: true, matchId: result.match.matchId, full: true });
+      continue;
+    } catch (err) {
+      // ani historia klienta, ani statystyki zaszyte w pliku nie zadziałały -
+      // zapisz zapasowo minimalny wpis poniżej
     }
 
     try {
       // Jeśli ten mecz jest już zapisany (nawet z wcześniejszego importu), nie
-      // degraduj go do pustego wpisu tylko dlatego, że akurat teraz klient
-      // League nie ma do niego dostępu - zostaw istniejące dane bez zmian.
+      // degraduj go do pustego wpisu tylko dlatego, że akurat teraz ani
+      // historia klienta, ani plik .rofl nie dały danych - zostaw bez zmian.
       if (store.getMatch(gameId)) {
         results.push({
           filePath,
           ok: false,
-          error: 'Mecz już istnieje lokalnie, a klient League nie ma teraz dostępu do jego pełnych danych - pozostawiono bez zmian.',
+          error: 'Mecz już istnieje lokalnie, a teraz nie udało się pobrać jego pełnych danych - pozostawiono bez zmian.',
         });
         continue;
       }
@@ -432,6 +465,7 @@ ipcMain.handle('rofl:import', async (_evt, filePaths) => {
       const stat = fs.statSync(filePath);
       const match = {
         matchId: gameId,
+        dataSource: 'placeholder',
         gameCreationDate: stat.mtime.toISOString(),
         gameDurationSec: '',
         gameMode: '',
@@ -453,9 +487,9 @@ ipcMain.handle('rofl:import', async (_evt, filePaths) => {
         redTowerKills: 0,
         redInhibKills: 0,
         notes:
-          'Import z pliku .rofl bez pełnych danych - klient League nie był uruchomiony albo nie miał dostępu ' +
-          'do historii tej gry. Spróbuj ponownie, gdy będzie zalogowane konto, które w niej grało, albo użyj ' +
-          '"Import z historii klienta" / uzupełnij dane ręcznie.',
+          'Import z pliku .rofl bez pełnych danych - ani historia klienta League (nie było do niej dostępu), ' +
+          'ani sam plik .rofl (brak statystyk graczy w środku) nie dały danych. Spróbuj ponownie, gdy klient ' +
+          'będzie uruchomiony z kontem, które grało w tej grze, albo użyj "Import z historii klienta" / uzupełnij dane ręcznie.',
         rawDataJson: '',
       };
       store.saveMatch(match, []);
