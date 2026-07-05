@@ -106,6 +106,43 @@
       </table>
     </section>
 
+    <section id="scanner-section">
+      <h2>Skanowanie zakresu Game ID</h2>
+      <p>
+        Ostatnia deska ratunku, gdy powyższa historia klienta się urywa (twardy
+        limit lokalnego cache League): sprawdza po kolei każdy Game ID w
+        podanym zakresie przez <code>/lol-match-history/v1/games/{id}</code> i
+        zapamiętuje te, w których brało udział <b>aktualnie zalogowane
+        konto</b>. Ważne ograniczenie: to konto musi było osobiście grać w
+        danym meczu - meczów hostowanych/nagranych przez kogoś innego, w
+        których to konto nie grało, ten skan nigdy nie znajdzie (do tego
+        służy import .rofl / starych plików JSON wyżej).
+      </p>
+      <p>
+        <code>gameId</code> jest globalnym licznikiem dla całego serwera, nie
+        jest powiązany z datą ani z Twoim kontem - zakres odpowiadający kilku
+        dniom grania może obejmować miliony cudzych meczów do przelecenia po
+        kolei. Dlatego skan działa powoli (ograniczona liczba zapytań na
+        sekundę, żeby nie obciążać serwerów Riota) i może trwać godzinami albo
+        dniami - da się go bezpiecznie zatrzymać i wznowić później od
+        ostatniego sprawdzonego ID, nawet po zamknięciu apki.
+      </p>
+      <p>
+        <label for="scanner-start-id">Od Game ID:</label>
+        <input type="text" id="scanner-start-id" placeholder="np. 3880767863" size="15" />
+        <label for="scanner-end-id">do Game ID:</label>
+        <input type="text" id="scanner-end-id" placeholder="np. 3889689613" size="15" />
+        <label for="scanner-rate">zapytań/s:</label>
+        <input type="number" id="scanner-rate" value="2" min="1" max="10" size="3" />
+      </p>
+      <p>
+        <button id="scanner-start-btn" type="button">Rozpocznij skanowanie</button>
+        <button id="scanner-resume-btn" type="button">Wznów od zapisanego postępu</button>
+        <button id="scanner-stop-btn" type="button" disabled>Zatrzymaj</button>
+      </p>
+      <p id="scanner-status">Brak zapisanego postępu skanowania.</p>
+    </section>
+
     <section id="rofl-import-section">
       <h2>Import z plików .rofl</h2>
       <p>

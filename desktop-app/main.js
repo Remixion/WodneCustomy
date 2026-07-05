@@ -4,6 +4,7 @@ const fs = require('fs');
 const { GameWatcher } = require('./src/collector/gameWatcher');
 const { collectMatch, buildMatchFromGameId } = require('./src/collector/matchBuilder');
 const { fetchRecentMatchSummaries, fetchMatchSummariesSince } = require('./src/collector/matchHistoryList');
+const { scanGameIdRange } = require('./src/collector/gameIdScanner');
 const { parseGameIdFromRoflFilename, detectDefaultReplaysFolder, listRoflFilesInFolder, extractEmbeddedStats } = require('./src/collector/roflParser');
 const { detectDefaultLegacyJsonFolder, listLegacyJsonFilesInFolder, buildMatchFromLegacyJson, extractGameId } = require('./src/collector/legacyJsonParser');
 const { enrichPlayer } = require('./src/collector/playerProfile');
@@ -381,6 +382,83 @@ ipcMain.handle('history:import-match', async (_evt, gameId) => {
   } catch (err) {
     return { ok: false, error: String(err) };
   }
+});
+
+// ---- IPC: skaner zakresu Game ID (patrz komentarz w gameIdScanner.js o ograniczeniach) ----
+let scanSession = null;
+
+ipcMain.handle('scanner:start', async (_evt, { startId, endId, requestsPerSecond, resume }) => {
+  if (scanSession && scanSession.running) {
+    return { ok: false, error: 'Skanowanie już trwa.' };
+  }
+  const client = createOneOffLcuClient();
+  if (!client) return { ok: false, error: 'Klient League of Legends nie jest uruchomiony.' };
+  const puuid = await getCurrentSummonerPuuid(client);
+  if (!puuid) return { ok: false, error: 'Nie udało się odczytać puuid zalogowanego gracza.' };
+
+  const cfg = configStore.getAll();
+  const numStartId = Number(startId);
+  const numEndId = Number(endId);
+  const sameRangeSaved = resume && String(cfg.scanStartId) === String(numStartId) && String(cfg.scanEndId) === String(numEndId) && cfg.scanLastId !== '';
+  const startFromId = sameRangeSaved ? Number(cfg.scanLastId) + 1 : numStartId;
+
+  if (startFromId > numEndId) {
+    return { ok: false, error: 'Zapisany postęp wskazuje, że ten zakres jest już w całości sprawdzony.' };
+  }
+
+  configStore.setAll({
+    scanStartId: numStartId,
+    scanEndId: numEndId,
+    scanLastId: startFromId - 1,
+    scanRequestsPerSecond: requestsPerSecond || 2,
+  });
+
+  scanSession = { running: true, stopRequested: false };
+
+  scanSession.promise = scanGameIdRange(client, puuid, {
+    startId: numStartId,
+    endId: numEndId,
+    startFromId,
+    requestsPerSecond: requestsPerSecond || 2,
+    shouldStop: () => scanSession.stopRequested,
+    onProgress: (p) => {
+      configStore.setAll({ scanLastId: p.lastId });
+      sendToRenderer('scanner:progress', {
+        checked: p.checked,
+        errors: p.errors,
+        lastId: p.lastId,
+        startId: numStartId,
+        endId: numEndId,
+        newlyFound: p.newlyFound,
+      });
+    },
+  })
+    .then((result) => {
+      scanSession.running = false;
+      sendToRenderer('scanner:done', result);
+    })
+    .catch((err) => {
+      scanSession.running = false;
+      sendToRenderer('scanner:done', { error: String(err) });
+    });
+
+  return { ok: true, startFromId };
+});
+
+ipcMain.handle('scanner:stop', () => {
+  if (scanSession) scanSession.stopRequested = true;
+  return { ok: true };
+});
+
+ipcMain.handle('scanner:get-saved-progress', () => {
+  const cfg = configStore.getAll();
+  return {
+    scanStartId: cfg.scanStartId,
+    scanEndId: cfg.scanEndId,
+    scanLastId: cfg.scanLastId,
+    scanRequestsPerSecond: cfg.scanRequestsPerSecond,
+    running: !!(scanSession && scanSession.running),
+  };
 });
 
 // ---- IPC: import z plików .rofl (patrz komentarz w roflParser.js o ograniczeniach) ----

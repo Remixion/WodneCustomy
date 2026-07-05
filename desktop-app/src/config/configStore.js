@@ -16,6 +16,12 @@ class ConfigStore {
       discordGuildId: '',
       roflFolderPath: '',
       legacyJsonFolderPath: '',
+      // Postęp skanera zakresu Game ID (gameIdScanner.js) - zapisywany, żeby
+      // dało się wznowić wielogodzinne/wielodniowe skanowanie po restarcie apki.
+      scanStartId: '',
+      scanEndId: '',
+      scanLastId: '',
+      scanRequestsPerSecond: 2,
     };
     this.data = this.load();
   }

@@ -108,13 +108,29 @@ doimportowanie takiego meczu:
    - **Sprawdź datę pojedynczego meczu po Game ID** - pokazuje datę i tryb
      jednej, konkretnej gry bez importowania jej. Przydatne, gdy znasz tylko
      numer `gameId` skrajnego meczu z jakiegoś okresu (np. z nazwy pliku
-     `.rofl`) i chcesz sprawdzić, od jakiej daty użyć opcji powyżej - `gameId`
-     to globalny licznik dla całego shardu (nie jest powiązany z Twoim
-     kontem ani z datą w żaden przewidywalny sposób), więc **nie da się** po
-     samych numerach ID wywnioskować zakresu dat ani "przeleźć" po kolei
-     wszystkich ID między dwoma znanymi meczami - trzeba zapytać klienta
-     o konkretną datę każdego z osobna.
-2. **Import z plików .rofl** - w zakładce **Ustawienia** wpisz ścieżkę do
+     `.rofl`) i chcesz sprawdzić, od jakiej daty użyć opcji powyżej.
+2. **Skanowanie zakresu Game ID** (ostatnia deska ratunku, gdy historia
+   klienta się urywa) - `gameId` jest globalnym licznikiem dla całego shardu,
+   nie jest powiązany z Twoim kontem ani z datą w przewidywalny sposób, więc
+   nie da się z samych numerów ID wywnioskować dat. Zamiast tego apka może
+   sprawdzić po kolei każdy `gameId` w podanym zakresie przez
+   `/lol-match-history/v1/games/{id}` i zapamiętać te, w których brało udział
+   zalogowane konto (dopisując je od razu do tabeli meczów z historii wyżej -
+   z tym samym filtrem "tylko custom"). **Ograniczenia, które trzeba
+   zaakceptować:**
+   - Znajdzie **wyłącznie mecze, w których zalogowane konto osobiście
+     grało** - meczów hostowanych/nagranych przez kogoś innego (bez udziału
+     tego konta) nie znajdzie nigdy; do tego nadal służy import `.rofl` /
+     starych plików JSON.
+   - Zakres odpowiadający kilku dniom grania może obejmować **miliony**
+     cudzych meczów z całego serwera do sprawdzenia po kolei - skan celowo
+     działa wolno (ograniczona liczba zapytań/s, domyślnie 2), żeby nie
+     obciążać serwerów Riota, więc dla dużych zakresów może to być kwestia
+     dni, a nie minut.
+   - Da się bezpiecznie zatrzymać w dowolnym momencie i **wznowić później od
+     ostatniego sprawdzonego ID** (nawet po zamknięciu i ponownym otwarciu
+     apki) przyciskiem "Wznów od zapisanego postępu".
+3. **Import z plików .rofl** - w zakładce **Ustawienia** wpisz ścieżkę do
    folderu `Replays` klienta League (albo kliknij "Wykryj automatycznie"),
    a w zakładce **Mecze**, sekcja "Import z plików .rofl", kliknij "Wczytaj
    listę z folderu" - zobaczysz wszystkie pliki `.rofl` z tego folderu wraz
@@ -146,7 +162,7 @@ doimportowanie takiego meczu:
    Jeśli obie metody zawiodą, można i tak zaimportować - zostanie zapisany
    tylko podstawowy, pusty wpis (identyfikator gry) do ręcznego uzupełnienia
    albo ponownej próby później.
-3. **Import ze starych plików JSON** - jeśli masz mecze zapisane wcześniej
+4. **Import ze starych plików JSON** - jeśli masz mecze zapisane wcześniej
    jakimś innym/starszym narzędziem jako pliki `.json` (pełne statystyki, nie
    pliki `.rofl`), w zakładce **Ustawienia** wpisz ścieżkę do folderu z tymi
    plikami (albo kliknij "Wykryj automatycznie" - podpowie folder danych

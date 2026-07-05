@@ -224,6 +224,119 @@ document.getElementById('history-lookup-btn').addEventListener('click', async ()
   }
 });
 
+// ---- Skaner zakresu Game ID (patrz komentarz w gameIdScanner.js o ograniczeniach) ----
+
+function setScannerRunningUi(running) {
+  document.getElementById('scanner-start-btn').disabled = running;
+  document.getElementById('scanner-resume-btn').disabled = running;
+  document.getElementById('scanner-stop-btn').disabled = !running;
+}
+
+async function refreshExistingIdsSet() {
+  const stored = await window.api.store.listMatches();
+  return new Set(stored.map((m) => String(m.match.matchId)));
+}
+
+async function addFoundGamesToHistoryTable(newlyFound) {
+  if (!newlyFound || !newlyFound.length) return;
+  const existingIds = await refreshExistingIdsSet();
+  const withImportedFlag = newlyFound.map((g) => ({ ...g, alreadyImported: existingIds.has(g.gameId) }));
+  const knownIds = new Set(lastHistoryMatches.map((m) => m.gameId));
+  const merged = lastHistoryMatches.concat(withImportedFlag.filter((g) => !knownIds.has(g.gameId)));
+  lastHistoryMatches = merged.sort((a, b) => new Date(b.gameCreationDate) - new Date(a.gameCreationDate));
+  renderHistoryRows();
+}
+
+function formatScannerStatus({ checked, errors, foundCount, startId, endId, lastId, running, stopped }) {
+  const total = endId - startId + 1;
+  const done = lastId - startId + 1;
+  const pct = total > 0 ? ((done / total) * 100).toFixed(4) : '0';
+  return (
+    `Sprawdzono ${checked} (do ID ${lastId} z ${total} w zakresie, ${pct}%), ` +
+    `błędów: ${errors}, znaleziono Twoich meczów: ${foundCount}` +
+    (running ? ' - skanowanie trwa...' : stopped ? ' - zatrzymano.' : ' - zakończono cały zakres.')
+  );
+}
+
+let scannerLastStats = { checked: 0, errors: 0, foundCount: 0, startId: 0, endId: 0, lastId: 0 };
+
+window.api.scanner.onProgress((p) => {
+  scannerLastStats = { ...scannerLastStats, ...p, foundCount: scannerLastStats.foundCount + (p.newlyFound ? p.newlyFound.length : 0) };
+  document.getElementById('scanner-status').textContent = formatScannerStatus({ ...scannerLastStats, running: true });
+  addFoundGamesToHistoryTable(p.newlyFound);
+});
+
+window.api.scanner.onDone((result) => {
+  setScannerRunningUi(false);
+  if (result.error) {
+    document.getElementById('scanner-status').textContent = `Błąd skanowania: ${result.error}`;
+    logEvent(`Skanowanie Game ID: błąd - ${result.error}`);
+    return;
+  }
+  scannerLastStats = { ...scannerLastStats, checked: result.checked, errors: result.errors, lastId: result.lastId };
+  document.getElementById('scanner-status').textContent = formatScannerStatus({ ...scannerLastStats, running: false, stopped: result.stopped });
+  logEvent(
+    `Skanowanie Game ID zakończone: sprawdzono ${result.checked}, znaleziono ${scannerLastStats.foundCount} mecz(ów)` +
+      (result.stopped ? ' (zatrzymane ręcznie, można wznowić)' : ' (cały zakres sprawdzony)')
+  );
+});
+
+async function startScanner(resume) {
+  const startId = document.getElementById('scanner-start-id').value.trim();
+  const endId = document.getElementById('scanner-end-id').value.trim();
+  const requestsPerSecond = Number(document.getElementById('scanner-rate').value) || 2;
+  if (!startId || !endId) {
+    document.getElementById('scanner-status').textContent = 'Podaj Game ID początkowy i końcowy.';
+    return;
+  }
+
+  if (!resume) {
+    const saved = await window.api.scanner.getSavedProgress();
+    const sameRange = String(saved.scanStartId) === startId && String(saved.scanEndId) === endId;
+    const hasProgress = saved.scanLastId !== '' && Number(saved.scanLastId) < Number(endId);
+    if (sameRange && hasProgress) {
+      const confirmed = confirm(
+        `Ten zakres ma już zapisany postęp (sprawdzono do ID ${saved.scanLastId}). ` +
+          'Kliknięcie "Rozpocznij" zacznie od nowa i skasuje ten postęp - czy na pewno? ' +
+          '(żeby kontynuować od zapisanego miejsca, użyj zamiast tego "Wznów od zapisanego postępu")'
+      );
+      if (!confirmed) return;
+    }
+  }
+
+  scannerLastStats = { checked: 0, errors: 0, foundCount: 0, startId: Number(startId), endId: Number(endId), lastId: Number(startId) - 1 };
+  document.getElementById('scanner-status').textContent = 'Uruchamianie skanowania...';
+  const result = await window.api.scanner.start({ startId, endId, requestsPerSecond, resume });
+  if (!result.ok) {
+    document.getElementById('scanner-status').textContent = `Błąd: ${result.error}`;
+    return;
+  }
+  scannerLastStats.lastId = result.startFromId - 1;
+  setScannerRunningUi(true);
+  logEvent(`Rozpoczęto skanowanie Game ID od ${result.startFromId} do ${endId} (${requestsPerSecond} zapytań/s)`);
+}
+
+document.getElementById('scanner-start-btn').addEventListener('click', () => startScanner(false));
+document.getElementById('scanner-resume-btn').addEventListener('click', () => startScanner(true));
+document.getElementById('scanner-stop-btn').addEventListener('click', async () => {
+  await window.api.scanner.stop();
+  document.getElementById('scanner-status').textContent += ' Zatrzymywanie (dokończy bieżące zapytanie)...';
+});
+
+(async function initScannerStatus() {
+  const saved = await window.api.scanner.getSavedProgress();
+  if (saved.scanStartId !== '' && saved.scanLastId !== '') {
+    document.getElementById('scanner-start-id').value = saved.scanStartId;
+    document.getElementById('scanner-end-id').value = saved.scanEndId;
+    document.getElementById('scanner-rate').value = saved.scanRequestsPerSecond || 2;
+    const remaining = Number(saved.scanEndId) - Number(saved.scanLastId);
+    document.getElementById('scanner-status').textContent =
+      `Zapisany postęp: sprawdzono do ID ${saved.scanLastId} z zakresu ${saved.scanStartId}-${saved.scanEndId} ` +
+      `(pozostało ${remaining} ID). Kliknij "Wznów od zapisanego postępu", żeby kontynuować.`;
+  }
+  setScannerRunningUi(saved.running);
+})();
+
 function fileBaseName(filePath) {
   const parts = filePath.split(/[\\/]/);
   return parts[parts.length - 1] || filePath;

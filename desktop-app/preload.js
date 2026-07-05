@@ -38,6 +38,13 @@ contextBridge.exposeInMainWorld('api', {
     lookupGame: (gameId) => ipcRenderer.invoke('history:lookup-game', gameId),
     importMatch: (gameId) => ipcRenderer.invoke('history:import-match', gameId),
   },
+  scanner: {
+    start: (params) => ipcRenderer.invoke('scanner:start', params),
+    stop: () => ipcRenderer.invoke('scanner:stop'),
+    getSavedProgress: () => ipcRenderer.invoke('scanner:get-saved-progress'),
+    onProgress: (cb) => ipcRenderer.on('scanner:progress', (_evt, data) => cb(data)),
+    onDone: (cb) => ipcRenderer.on('scanner:done', (_evt, data) => cb(data)),
+  },
   rofl: {
     pickFiles: () => ipcRenderer.invoke('rofl:pick-files'),
     preview: (filePaths) => ipcRenderer.invoke('rofl:preview', filePaths),
