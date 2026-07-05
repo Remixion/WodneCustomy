@@ -38,6 +38,41 @@ function normalizeTeamPosition(position) {
   return position === 'UTILITY' ? 'SUPPORT' : position;
 }
 
+const SUMMONER_SPELL_SMITE_ID = 11;
+const STANDARD_POSITIONS = ['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'SUPPORT'];
+
+/**
+ * Riotowe "lane" bywa błędne na tyle, że w jednej drużynie potrafi wskazać
+ * dwóch graczy jako JUNGLE (żaden combo z "role" tego nie naprawi). Jedyny
+ * gracz na pozycji JUNGLE może mieć w wyposażeniu Smite'a (id 11) - jeśli
+ * dokładnie jeden z "podwójnych" jungli ma Smite'a, a w drużynie brakuje
+ * dokładnie jednej innej pozycji, to ten drugi gracz naprawdę grał na tej
+ * brakującej pozycji.
+ */
+function resolveDuplicateJungles(players) {
+  ['BLUE', 'RED'].forEach((team) => {
+    const teamPlayers = players.filter((p) => p.team === team);
+    const junglers = teamPlayers.filter((p) => p.teamPosition === 'JUNGLE');
+    if (junglers.length <= 1) return;
+
+    const missingPositions = STANDARD_POSITIONS.filter(
+      (pos) => !teamPlayers.some((p) => p.teamPosition === pos)
+    );
+    if (missingPositions.length !== 1) return; // niejednoznaczne - nie zgaduj
+
+    const withSmite = junglers.filter(
+      (p) => p.spell1 === SUMMONER_SPELL_SMITE_ID || p.spell2 === SUMMONER_SPELL_SMITE_ID
+    );
+    if (withSmite.length !== 1) return; // brak jednoznacznego Smite'a - nie zgaduj
+
+    junglers
+      .filter((p) => p !== withSmite[0])
+      .forEach((p) => {
+        p.teamPosition = missingPositions[0];
+      });
+  });
+}
+
 /**
  * Buduje znormalizowany rekord meczu + listę graczy na bazie
  * /lol-match-history/v1/games/{gameId} (ten sam kształt danych co publiczne
@@ -186,6 +221,8 @@ async function buildMatchFromGameId(client, gameId, { includeEogStatsBlock = fal
       notes: '',
     };
   });
+
+  resolveDuplicateJungles(players);
 
   return { match, players };
 }
