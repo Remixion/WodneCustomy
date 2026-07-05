@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const { GameWatcher } = require('./src/collector/gameWatcher');
 const { collectMatch, buildMatchFromGameId } = require('./src/collector/matchBuilder');
-const { fetchRecentMatchSummaries } = require('./src/collector/matchHistoryList');
+const { fetchRecentMatchSummaries, fetchMatchSummariesSince } = require('./src/collector/matchHistoryList');
 const { parseGameIdFromRoflFilename, detectDefaultReplaysFolder, listRoflFilesInFolder, extractEmbeddedStats } = require('./src/collector/roflParser');
 const { detectDefaultLegacyJsonFolder, listLegacyJsonFilesInFolder, buildMatchFromLegacyJson, extractGameId } = require('./src/collector/legacyJsonParser');
 const { enrichPlayer } = require('./src/collector/playerProfile');
@@ -317,6 +317,20 @@ ipcMain.handle('history:list-recent-matches', async (_evt, count) => {
     const puuid = await getCurrentSummonerPuuid(client);
     if (!puuid) return { ok: false, error: 'Nie udało się odczytać puuid zalogowanego gracza.' };
     const summaries = await fetchRecentMatchSummaries(client, puuid, count || 20);
+    const existingIds = new Set(store.listMatches().map((m) => String(m.match.matchId)));
+    return { ok: true, matches: summaries.map((s) => ({ ...s, alreadyImported: existingIds.has(s.gameId) })) };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+});
+
+ipcMain.handle('history:list-matches-since', async (_evt, sinceDateIso) => {
+  try {
+    const client = createOneOffLcuClient();
+    if (!client) return { ok: false, error: 'Klient League of Legends nie jest uruchomiony.' };
+    const puuid = await getCurrentSummonerPuuid(client);
+    if (!puuid) return { ok: false, error: 'Nie udało się odczytać puuid zalogowanego gracza.' };
+    const summaries = await fetchMatchSummariesSince(client, puuid, sinceDateIso);
     const existingIds = new Set(store.listMatches().map((m) => String(m.match.matchId)));
     return { ok: true, matches: summaries.map((s) => ({ ...s, alreadyImported: existingIds.has(s.gameId) })) };
   } catch (err) {

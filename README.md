@@ -86,10 +86,14 @@ wtedy przy komputerze), zakładka **Mecze** oferuje dwa sposoby na
 doimportowanie takiego meczu:
 
 1. **Import z historii klienta League** (zalecane, pełne dane) - przycisk
-   "Wczytaj ostatnie mecze z klienta" pokazuje listę Twoich ostatnich gier
-   zapisanych lokalnie przez sam klient League (dotyczy też meczów sprzed
-   wielu miesięcy) - wystarczy kliknąć "Importuj" przy wybranym meczu, żeby
-   pobrać dokładnie te same, pełne dane co przy automatycznym
+   "Wczytaj ostatnie 20 meczów z klienta" pokazuje listę Twoich ostatnich gier
+   zapisanych lokalnie przez sam klient League. Można też wybrać datę i
+   kliknąć "Wczytaj mecze od tej daty", żeby pobrać **wszystkie** mecze od
+   tego dnia do teraz, zamiast stałej liczby ostatnich 20 - apka stronicuje
+   wtedy historię klienta, aż trafi na mecz starszy niż wybrana data (albo na
+   koniec lokalnej historii, jeśli klient nie trzyma już tak starych gier w
+   swoim cache). W obu przypadkach wystarczy kliknąć "Importuj" przy wybranym
+   meczu, żeby pobrać dokładnie te same, pełne dane co przy automatycznym
    przechwytywaniu. Wymaga uruchomionego i zalogowanego klienta League.
 2. **Import z plików .rofl** - w zakładce **Ustawienia** wpisz ścieżkę do
    folderu `Replays` klienta League (albo kliknij "Wykryj automatycznie"),

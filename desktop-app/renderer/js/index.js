@@ -99,12 +99,14 @@ document.getElementById('push-all-btn').addEventListener('click', async () => {
   logEvent(`Zakończono wysyłkę: ${results.length - failed.length}/${results.length} OK`);
 });
 
-async function loadHistoryList() {
+async function loadHistoryList(fetchPromise, loadingLabel) {
   const tbody = document.getElementById('history-tbody');
-  tbody.innerHTML = '<tr><td colspan="6">Wczytywanie historii z klienta...</td></tr>';
+  const statusEl = document.getElementById('history-list-status');
+  statusEl.textContent = '';
+  tbody.innerHTML = `<tr><td colspan="6">${loadingLabel}</td></tr>`;
   let result;
   try {
-    result = await window.api.history.listRecentMatches(20);
+    result = await fetchPromise;
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="6">Błąd: ${err.message}</td></tr>`;
     return;
@@ -114,6 +116,7 @@ async function loadHistoryList() {
     return;
   }
   tbody.innerHTML = '';
+  statusEl.textContent = `Znaleziono ${result.matches.length} mecz(ów).`;
   if (!result.matches.length) {
     tbody.innerHTML = '<tr><td colspan="6">Brak meczów w lokalnej historii klienta.</td></tr>';
     return;
@@ -141,7 +144,7 @@ async function loadHistoryList() {
         logEvent(`Import meczu ${m.gameId}: błąd - ${err.message}`);
       } finally {
         loadMatches();
-        loadHistoryList();
+        reloadHistoryList();
       }
     });
     actionsTd.appendChild(importBtn);
@@ -158,7 +161,26 @@ async function loadHistoryList() {
   });
 }
 
-document.getElementById('history-list-btn').addEventListener('click', loadHistoryList);
+/** Zapamiętuje ostatnio użyty sposób wczytania listy (ostatnie N / od daty), żeby odświeżyć nią listę po imporcie. */
+let reloadHistoryList = () => {};
+
+function loadRecentHistory() {
+  reloadHistoryList = loadRecentHistory;
+  loadHistoryList(window.api.history.listRecentMatches(20), 'Wczytywanie ostatnich 20 meczów z klienta...');
+}
+
+function loadHistorySince() {
+  const dateValue = document.getElementById('history-since-date').value;
+  if (!dateValue) {
+    document.getElementById('history-list-status').textContent = 'Wybierz najpierw datę.';
+    return;
+  }
+  reloadHistoryList = loadHistorySince;
+  loadHistoryList(window.api.history.listMatchesSince(dateValue), `Wczytywanie meczów od ${dateValue}...`);
+}
+
+document.getElementById('history-list-btn').addEventListener('click', loadRecentHistory);
+document.getElementById('history-since-btn').addEventListener('click', loadHistorySince);
 
 function fileBaseName(filePath) {
   const parts = filePath.split(/[\\/]/);

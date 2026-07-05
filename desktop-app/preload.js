@@ -34,6 +34,7 @@ contextBridge.exposeInMainWorld('api', {
   },
   history: {
     listRecentMatches: (count) => ipcRenderer.invoke('history:list-recent-matches', count),
+    listMatchesSince: (sinceDateIso) => ipcRenderer.invoke('history:list-matches-since', sinceDateIso),
     importMatch: (gameId) => ipcRenderer.invoke('history:import-match', gameId),
   },
   rofl: {

@@ -65,9 +65,18 @@
         Pozwala doimportować mecze, w których apka nie była uruchomiona
         w chwili zakończenia gry (np. gdy Cię przy tym nie było) - z pełnymi
         statystykami, tak jak przy zwykłym automatycznym przechwytywaniu.
-        Wymaga uruchomionego i zalogowanego klienta League of Legends.
+        Wymaga uruchomionego i zalogowanego klienta League of Legends. To
+        lokalna historia zapisana przez sam klient - dla starszych dat lista
+        może się urwać wcześniej, niż faktyczna liczba rozegranych meczów by
+        sugerowała, jeśli klient nie trzyma ich już w swoim cache.
       </p>
-      <p><button id="history-list-btn" type="button">Wczytaj ostatnie mecze z klienta</button></p>
+      <p><button id="history-list-btn" type="button">Wczytaj ostatnie 20 meczów z klienta</button></p>
+      <p>
+        <label for="history-since-date">albo wszystkie mecze od daty:</label>
+        <input type="date" id="history-since-date" />
+        <button id="history-since-btn" type="button">Wczytaj mecze od tej daty</button>
+      </p>
+      <p id="history-list-status"></p>
       <table id="history-table" border="1">
         <thead>
           <tr>
