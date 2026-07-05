@@ -15,6 +15,14 @@ const fs = require('fs');
  * ten sam matchId sprawi, że nowe, pełne dane z prawdziwym Blue/Red
  * nadpiszą ten wpis zamiast tworzyć duplikat.
  *
+ * `gid` (numer wiersza z arkusza, np. "5") i `matchId` (identyfikator meczu
+ * w tej apce) to celowo dwa OSOBNE pola: `gid` to zawsze oryginalna,
+ * chronologiczna numeracja z arkusza (nigdy się nie zmienia), a `matchId` to
+ * prawdziwe ID z systemu League z kolumny `LoLID`, jeśli jest już znane, albo
+ * `legacy-<gid z zerami>` w przeciwnym razie - to na nim opiera się zapis
+ * lokalny i klucz w Arkuszu, więc może się "podmienić" na prawdziwe Game ID
+ * bez utraty powiązania z oryginalnym wierszem (`gid` zostaje bez zmian).
+ *
  * Gracze nie mają tu puuid (to tylko nicki) - używamy znormalizowanego nicku
  * jako stabilnego zastępczego klucza ("nick:<nick>"), żeby statystyki tej
  * samej osoby łączyły się między meczami z tego arkusza. To nie jest
@@ -86,6 +94,7 @@ function buildMatchFromLeagueSheetRow(row) {
 
   const match = {
     matchId,
+    gid,
     dataSource: 'league-sheet',
     gameCreationDate,
     gameDurationSec: '',

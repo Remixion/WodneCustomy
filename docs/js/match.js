@@ -1,5 +1,5 @@
 const MATCH_FIELDS = [
-  'gameCreationDate', 'gameDurationSec', 'gameMode', 'gameType', 'mapId', 'queueId', 'gameVersion',
+  'gid', 'gameCreationDate', 'gameDurationSec', 'gameMode', 'gameType', 'mapId', 'queueId', 'gameVersion',
   'winningTeam', 'blueBans', 'redBans',
   'blueBaronKills', 'blueDragonKills', 'blueHeraldKills', 'blueTowerKills', 'blueInhibKills',
   'redBaronKills', 'redDragonKills', 'redHeraldKills', 'redTowerKills', 'redInhibKills',

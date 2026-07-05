@@ -3,7 +3,7 @@ async function loadMatches() {
   const matches = await window.api.store.listMatches();
   tbody.innerHTML = '';
   if (!matches.length) {
-    tbody.innerHTML = '<tr><td colspan="11">Brak zarejestrowanych meczów. Rozegraj custom 5v5, a dane pojawią się tu automatycznie po jego zakończeniu.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12">Brak zarejestrowanych meczów. Rozegraj custom 5v5, a dane pojawią się tu automatycznie po jego zakończeniu.</td></tr>';
     return;
   }
   matches.forEach(({ match }) => {
@@ -65,6 +65,7 @@ async function loadMatches() {
 
     tr.innerHTML = `
       <td>${match.matchId}</td>
+      <td>${match.gid || ''}</td>
       <td>${formatDataSource(match.dataSource)}</td>
       <td>${formatDate(match.gameCreationDate)}</td>
       <td>${match.gameMode || ''}</td>
