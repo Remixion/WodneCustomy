@@ -63,7 +63,7 @@ async function syncPlayersToSheets(players) {
  * (z historii klienta albo z pliku .rofl).
  */
 async function processCollectedMatch(client, { match, players }, { autoSyncOverride } = {}) {
-  store.saveMatch(match, players);
+  store.saveMatchPreservingData(match, players);
   sendToRenderer('collector:match-saved', { match, players });
 
   const enriched = [];
@@ -297,6 +297,17 @@ function createOneOffLcuClient() {
   return new LcuClient(info);
 }
 
+/** Odczytuje eogStatsBlock zachowany z wcześniejszego importu tego meczu (jeśli istnieje). */
+function getPreviousEogStatsBlock(gameId) {
+  const existing = store.getMatch(gameId);
+  if (!existing) return null;
+  try {
+    return JSON.parse(existing.match.rawDataJson).eogStatsBlock || null;
+  } catch (err) {
+    return null;
+  }
+}
+
 // ---- IPC: import z lokalnej historii meczów klienta (mecze sprzed uruchomienia tej apki) ----
 ipcMain.handle('history:list-recent-matches', async (_evt, count) => {
   try {
@@ -316,7 +327,8 @@ ipcMain.handle('history:import-match', async (_evt, gameId) => {
   try {
     const client = createOneOffLcuClient();
     if (!client) return { ok: false, error: 'Klient League of Legends nie jest uruchomiony.' };
-    const { match, players } = await buildMatchFromGameId(client, gameId, { includeEogStatsBlock: false });
+    const previousEogStatsBlock = getPreviousEogStatsBlock(gameId);
+    const { match, players } = await buildMatchFromGameId(client, gameId, { includeEogStatsBlock: false, previousEogStatsBlock });
     const result = await processCollectedMatch(client, { match, players });
     return { ok: true, matchId: result.match.matchId, enrichedCount: result.enrichedCount, syncResult: result.syncResult };
   } catch (err) {
@@ -371,7 +383,8 @@ ipcMain.handle('rofl:preview', async (_evt, filePaths) => {
       continue;
     }
     try {
-      const { match, players } = await buildMatchFromGameId(client, gameId, { includeEogStatsBlock: false });
+      const previousEogStatsBlock = getPreviousEogStatsBlock(gameId);
+      const { match, players } = await buildMatchFromGameId(client, gameId, { includeEogStatsBlock: false, previousEogStatsBlock });
       results.push({ filePath, gameId, ok: true, match, players });
     } catch (err) {
       results.push({ filePath, gameId, ok: false, error: String(err) });
@@ -392,7 +405,8 @@ ipcMain.handle('rofl:import', async (_evt, filePaths) => {
     const client = createOneOffLcuClient();
     if (client) {
       try {
-        const { match, players } = await buildMatchFromGameId(client, gameId, { includeEogStatsBlock: false });
+        const previousEogStatsBlock = getPreviousEogStatsBlock(gameId);
+        const { match, players } = await buildMatchFromGameId(client, gameId, { includeEogStatsBlock: false, previousEogStatsBlock });
         const result = await processCollectedMatch(client, { match, players });
         results.push({ filePath, ok: true, matchId: result.match.matchId, full: true });
         continue;
@@ -402,6 +416,18 @@ ipcMain.handle('rofl:import', async (_evt, filePaths) => {
     }
 
     try {
+      // Jeśli ten mecz jest już zapisany (nawet z wcześniejszego importu), nie
+      // degraduj go do pustego wpisu tylko dlatego, że akurat teraz klient
+      // League nie ma do niego dostępu - zostaw istniejące dane bez zmian.
+      if (store.getMatch(gameId)) {
+        results.push({
+          filePath,
+          ok: false,
+          error: 'Mecz już istnieje lokalnie, a klient League nie ma teraz dostępu do jego pełnych danych - pozostawiono bez zmian.',
+        });
+        continue;
+      }
+
       const stat = fs.statSync(filePath);
       const match = {
         matchId: gameId,

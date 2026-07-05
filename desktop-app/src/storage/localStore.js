@@ -1,6 +1,25 @@
 const fs = require('fs');
 const path = require('path');
 
+function safeParseJson(str, fallback) {
+  if (!str) return fallback;
+  try {
+    return JSON.parse(str);
+  } catch (err) {
+    return fallback;
+  }
+}
+
+/** Scala dwa obiekty klucz-po-kluczu: wartość z "next", chyba że jest null/undefined - wtedy z "prev". */
+function mergePreferNonEmpty(prev, next) {
+  const merged = {};
+  new Set([...Object.keys(prev), ...Object.keys(next)]).forEach((key) => {
+    const nextVal = next[key];
+    merged[key] = nextVal === null || nextVal === undefined ? prev[key] : nextVal;
+  });
+  return merged;
+}
+
 /** Lokalny zapis danych jako pliki JSON: jeden plik na mecz + jeden zbiorczy plik graczy. */
 class LocalStore {
   constructor(baseDir) {
@@ -18,6 +37,41 @@ class LocalStore {
   saveMatch(match, players) {
     const file = path.join(this.matchesDir, `${match.matchId}.json`);
     fs.writeFileSync(file, JSON.stringify({ match, players }, null, 2), 'utf8');
+  }
+
+  /**
+   * Jak saveMatch, ale jeśli ten mecz był już zapisany wcześniej, scala nowe
+   * dane ze starymi zamiast je nadpisywać w ciemno - tak żeby ponowny import
+   * (np. przycisk "Importuj ponownie") nie kasował rzeczy niedostępnych przy
+   * tym konkretnym pobraniu: przede wszystkim eogStatsBlock wewnątrz
+   * rawDataJson (dostępny tylko przy żywym przechwytywaniu, nie przy
+   * imporcie z historii/pliku .rofl) oraz ręcznie wpisane notatki (meczu
+   * i poszczególnych graczy).
+   */
+  saveMatchPreservingData(match, players) {
+    const existing = this.getMatch(match.matchId);
+    if (existing) {
+      if (!match.notes && existing.match.notes) {
+        match.notes = existing.match.notes;
+      }
+
+      const oldRaw = safeParseJson(existing.match.rawDataJson, {});
+      const newRaw = safeParseJson(match.rawDataJson, {});
+      match.rawDataJson = JSON.stringify(mergePreferNonEmpty(oldRaw, newRaw));
+
+      const existingPlayerByPuuid = {};
+      (existing.players || []).forEach((p) => {
+        if (p.puuid) existingPlayerByPuuid[p.puuid] = p;
+      });
+      players.forEach((p) => {
+        const prevPlayer = p.puuid && existingPlayerByPuuid[p.puuid];
+        if (prevPlayer && !p.notes && prevPlayer.notes) {
+          p.notes = prevPlayer.notes;
+        }
+      });
+    }
+
+    this.saveMatch(match, players);
   }
 
   listMatches() {

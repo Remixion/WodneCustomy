@@ -83,9 +83,14 @@ function resolveDuplicateJungles(players) {
  * eogStatsBlock (/lol-end-of-game/v1/eog-stats-block) to niedokumentowane,
  * przejściowe dane z ekranu końca gry - mają sens tylko tuż po zakończeniu
  * aktualnie rozgrywanej gry, dlatego dołączamy je wyłącznie w collectMatch,
- * nigdy przy imporcie historycznego meczu.
+ * nigdy przy imporcie historycznego meczu. Jeśli mecz był już wcześniej
+ * zaimportowany z prawdziwym eogStatsBlock, przekaż go jako
+ * previousEogStatsBlock - zostanie użyty do wyliczenia teamPosition
+ * (detectedTeamPosition), żeby ponowny import (np. przycisk "Importuj
+ * ponownie") nie pogorszył dokładności roli graczy tylko dlatego, że tym
+ * razem eogStatsBlock nie jest dostępny na świeżo.
  */
-async function buildMatchFromGameId(client, gameId, { includeEogStatsBlock = false } = {}) {
+async function buildMatchFromGameId(client, gameId, { includeEogStatsBlock = false, previousEogStatsBlock = null } = {}) {
   const matchHistory = await client.get(`/lol-match-history/v1/games/${gameId}`);
 
   let eogStatsBlock = null;
@@ -99,13 +104,15 @@ async function buildMatchFromGameId(client, gameId, { includeEogStatsBlock = fal
 
   const champMap = await getChampionMap(client);
 
-  // eogStatsBlock (dostępny tylko przy żywym przechwytywaniu) zawiera pole
-  // "detectedTeamPosition" - znacznie dokładniejsze wykrycie roli gracza niż
-  // "timeline.lane" z /lol-match-history, które w customach często zwraca
-  // niepoprawne/puste wartości.
+  // eogStatsBlock (dostępny tylko przy żywym przechwytywaniu, albo zachowany
+  // z poprzedniego importu) zawiera pole "detectedTeamPosition" - znacznie
+  // dokładniejsze wykrycie roli gracza niż "timeline.lane" z
+  // /lol-match-history, które w customach często zwraca niepoprawne/puste
+  // wartości.
   const eogPlayerByPuuid = {};
-  if (eogStatsBlock && Array.isArray(eogStatsBlock.teams)) {
-    eogStatsBlock.teams.forEach((team) => {
+  const effectiveEogStatsBlock = eogStatsBlock || previousEogStatsBlock;
+  if (effectiveEogStatsBlock && Array.isArray(effectiveEogStatsBlock.teams)) {
+    effectiveEogStatsBlock.teams.forEach((team) => {
       (team.players || []).forEach((eogPlayer) => {
         if (eogPlayer.puuid) eogPlayerByPuuid[eogPlayer.puuid] = eogPlayer;
       });
