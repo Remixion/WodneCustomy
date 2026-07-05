@@ -1,4 +1,45 @@
+const fs = require('fs');
+const os = require('os');
 const path = require('path');
+
+const DEFAULT_REPLAYS_CANDIDATES = [
+  path.join(os.homedir(), 'Documents', 'League of Legends', 'Replays'),
+  'C:/Riot Games/League of Legends/Replays',
+];
+
+/** Próbuje wykryć domyślny folder Replays klienta League (jeśli istnieje). */
+function detectDefaultReplaysFolder() {
+  return DEFAULT_REPLAYS_CANDIDATES.find((p) => {
+    try {
+      return fs.statSync(p).isDirectory();
+    } catch (err) {
+      return false;
+    }
+  }) || null;
+}
+
+/** Listuje pliki .rofl w podanym folderze (bez podfolderów) wraz z odczytanym z nazwy gameId. */
+function listRoflFilesInFolder(folderPath) {
+  if (!folderPath) return [];
+  let entries;
+  try {
+    entries = fs.readdirSync(folderPath, { withFileTypes: true });
+  } catch (err) {
+    throw new Error(`Nie udało się odczytać folderu "${folderPath}": ${err.message}`);
+  }
+  return entries
+    .filter((e) => e.isFile() && e.name.toLowerCase().endsWith('.rofl'))
+    .map((e) => {
+      const filePath = path.join(folderPath, e.name);
+      return {
+        filePath,
+        fileName: e.name,
+        gameId: parseGameIdFromRoflFilename(filePath),
+        mtime: fs.statSync(filePath).mtime.toISOString(),
+      };
+    })
+    .sort((a, b) => new Date(b.mtime) - new Date(a.mtime));
+}
 
 /**
  * Import meczów z plików .rofl (replay League of Legends).
@@ -25,4 +66,4 @@ function parseGameIdFromRoflFilename(filePath) {
   return match ? match[1] : null;
 }
 
-module.exports = { parseGameIdFromRoflFilename };
+module.exports = { parseGameIdFromRoflFilename, detectDefaultReplaysFolder, listRoflFilesInFolder };

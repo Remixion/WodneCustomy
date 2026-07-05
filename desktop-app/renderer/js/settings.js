@@ -8,6 +8,7 @@ async function load() {
   document.getElementById('discordClientId').value = cfg.discordClientId || '';
   document.getElementById('discordBotToken').value = cfg.discordBotToken || '';
   document.getElementById('discordGuildId').value = cfg.discordGuildId || '';
+  document.getElementById('roflFolderPath').value = cfg.roflFolderPath || '';
 }
 
 document.getElementById('settings-form').addEventListener('submit', async (evt) => {
@@ -21,9 +22,20 @@ document.getElementById('settings-form').addEventListener('submit', async (evt) 
     discordClientId: document.getElementById('discordClientId').value.trim(),
     discordBotToken: document.getElementById('discordBotToken').value.trim(),
     discordGuildId: document.getElementById('discordGuildId').value.trim(),
+    roflFolderPath: document.getElementById('roflFolderPath').value.trim(),
   };
   await window.api.config.set(partial);
   logEvent('Zapisano ustawienia');
+});
+
+document.getElementById('rofl-detect-folder-btn').addEventListener('click', async () => {
+  const detected = await window.api.rofl.detectDefaultFolder();
+  if (detected) {
+    document.getElementById('roflFolderPath').value = detected;
+    logEvent(`Wykryto folder Replays: ${detected}`);
+  } else {
+    logEvent('Nie udało się automatycznie wykryć folderu Replays - wpisz ścieżkę ręcznie.');
+  }
 });
 
 document.getElementById('discord-bot-sync-btn').addEventListener('click', async () => {

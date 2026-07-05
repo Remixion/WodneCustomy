@@ -212,6 +212,7 @@ async function importOneRoflFile(filePath, card) {
   );
   renderRoflImportResults(results);
   loadMatches();
+  if (document.getElementById('rofl-folder-tbody').children.length) loadRoflFolderList();
   card.remove();
 }
 
@@ -284,6 +285,52 @@ function renderRoflPreview(previewResults) {
     container.appendChild(card);
   });
 }
+
+async function loadRoflFolderList() {
+  const tbody = document.getElementById('rofl-folder-tbody');
+  const resultEl = document.getElementById('rofl-folder-result');
+  tbody.innerHTML = '<tr><td colspan="4">Wczytywanie listy plików...</td></tr>';
+  const result = await window.api.rofl.listFolder();
+  if (!result.ok) {
+    tbody.innerHTML = '';
+    resultEl.textContent = `Błąd: ${result.error}`;
+    return;
+  }
+  resultEl.textContent = `Znaleziono ${result.files.length} plik(ów) .rofl.`;
+  tbody.innerHTML = '';
+  if (!result.files.length) {
+    tbody.innerHTML = '<tr><td colspan="4">Brak plików .rofl w skonfigurowanym folderze.</td></tr>';
+    return;
+  }
+  result.files.forEach((f) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${f.fileName}</td>
+      <td>${f.gameId || '-'}</td>
+      <td>${f.alreadyImported ? 'Tak' : 'Nie'}</td>
+    `;
+    const actionsTd = document.createElement('td');
+    const previewBtn = document.createElement('button');
+    previewBtn.type = 'button';
+    previewBtn.textContent = 'Podgląd';
+    previewBtn.addEventListener('click', async () => {
+      previewBtn.disabled = true;
+      previewBtn.textContent = 'Wczytywanie...';
+      try {
+        const previewResults = await window.api.rofl.preview([f.filePath]);
+        renderRoflPreview(previewResults);
+      } finally {
+        previewBtn.disabled = false;
+        previewBtn.textContent = 'Podgląd';
+      }
+    });
+    actionsTd.appendChild(previewBtn);
+    tr.appendChild(actionsTd);
+    tbody.appendChild(tr);
+  });
+}
+
+document.getElementById('rofl-scan-folder-btn').addEventListener('click', loadRoflFolderList);
 
 document.getElementById('rofl-pick-btn').addEventListener('click', async () => {
   const resultEl = document.getElementById('rofl-import-result');

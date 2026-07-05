@@ -40,6 +40,8 @@ contextBridge.exposeInMainWorld('api', {
     pickFiles: () => ipcRenderer.invoke('rofl:pick-files'),
     preview: (filePaths) => ipcRenderer.invoke('rofl:preview', filePaths),
     import: (filePaths) => ipcRenderer.invoke('rofl:import', filePaths),
+    listFolder: () => ipcRenderer.invoke('rofl:list-folder'),
+    detectDefaultFolder: () => ipcRenderer.invoke('rofl:detect-default-folder'),
   },
   collector: {
     onStatus: (cb) => ipcRenderer.on('collector:status', (_evt, data) => cb(data)),

@@ -91,15 +91,27 @@ doimportowanie takiego meczu:
    wielu miesięcy) - wystarczy kliknąć "Importuj" przy wybranym meczu, żeby
    pobrać dokładnie te same, pełne dane co przy automatycznym
    przechwytywaniu. Wymaga uruchomionego i zalogowanego klienta League.
-2. **Import z pliku .rofl** - przycisk "Wybierz plik(i) .rofl" pozwala
-   wskazać zapisane repliki z folderu `Replays` klienta League. Uwaga: sam
-   plik `.rofl` **od patcha 13.20 nie zawiera już szczegółowych statystyk
-   graczy** - to potwierdzony, zgłoszony i nigdy niezałatany błąd po stronie
-   Riota ([RiotGames/developer-relations#831](https://github.com/RiotGames/developer-relations/issues/831)).
+2. **Import z plików .rofl** - w zakładce **Ustawienia** wpisz ścieżkę do
+   folderu `Replays` klienta League (albo kliknij "Wykryj automatycznie"),
+   a w zakładce **Mecze**, sekcja "Import z plików .rofl", kliknij "Wczytaj
+   listę z folderu" - zobaczysz wszystkie pliki `.rofl` z tego folderu wraz
+   z informacją, czy dany mecz jest już w bazie. Dla pojedynczych plików
+   spoza tego folderu wciąż można użyć "Wybierz plik(i) .rofl".
+
+   Uwaga: sam plik `.rofl` **od patcha 13.20 nie zawiera już szczegółowych
+   statystyk graczy** - to potwierdzony, zgłoszony i nigdy niezałatany błąd
+   po stronie Riota ([RiotGames/developer-relations#831](https://github.com/RiotGames/developer-relations/issues/831)).
    Dlatego import korzysta z identyfikatora gry zawartego w nazwie pliku
    (np. `EUN1-3880767863.rofl`) i pobiera pełne dane tym samym sposobem co
    punkt 1 powyżej - o ile klient League jest uruchomiony i ma dostęp do
-   historii tej gry. Jeśli się nie uda, zapisany zostanie tylko podstawowy,
+   historii tej gry.
+
+   Przed zapisem każdego meczu (z folderu albo wybranego ręcznie) apka
+   pokazuje **podgląd** danych (podsumowanie meczu + statystyki graczy) -
+   dopiero kliknięcie "Importuj ten mecz" faktycznie zapisuje dane i
+   synchronizuje je z Arkuszem; "Pomiń" odrzuca podgląd bez zapisu. Jeśli
+   podgląd się nie uda (np. klient League nie ma dostępu do historii danej
+   gry), można i tak zaimportować - zostanie zapisany tylko podstawowy,
    pusty wpis (identyfikator gry) do ręcznego uzupełnienia albo ponownej
    próby przez import z historii klienta.
 

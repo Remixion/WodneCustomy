@@ -4,7 +4,7 @@ const fs = require('fs');
 const { GameWatcher } = require('./src/collector/gameWatcher');
 const { collectMatch, buildMatchFromGameId } = require('./src/collector/matchBuilder');
 const { fetchRecentMatchSummaries } = require('./src/collector/matchHistoryList');
-const { parseGameIdFromRoflFilename } = require('./src/collector/roflParser');
+const { parseGameIdFromRoflFilename, detectDefaultReplaysFolder, listRoflFilesInFolder } = require('./src/collector/roflParser');
 const { enrichPlayer } = require('./src/collector/playerProfile');
 const { LocalStore } = require('./src/storage/localStore');
 const { ConfigStore } = require('./src/config/configStore');
@@ -333,6 +333,27 @@ ipcMain.handle('rofl:pick-files', async () => {
   });
   if (result.canceled) return [];
   return result.filePaths;
+});
+
+ipcMain.handle('rofl:detect-default-folder', () => detectDefaultReplaysFolder());
+
+// Lista plików .rofl ze skonfigurowanego folderu (patrz Ustawienia) wraz z informacją,
+// czy dany mecz jest już zapisany lokalnie.
+ipcMain.handle('rofl:list-folder', () => {
+  const cfg = configStore.getAll();
+  if (!cfg.roflFolderPath) {
+    return { ok: false, error: 'Nie skonfigurowano folderu z plikami .rofl (zakładka Ustawienia).' };
+  }
+  try {
+    const files = listRoflFilesInFolder(cfg.roflFolderPath);
+    const existingIds = new Set(store.listMatches().map((m) => String(m.match.matchId)));
+    return {
+      ok: true,
+      files: files.map((f) => ({ ...f, alreadyImported: f.gameId ? existingIds.has(f.gameId) : false })),
+    };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
 });
 
 // Podgląd danych meczu przed zapisem - wyłącznie odczyt, nic nie zapisuje ani nie synchronizuje.

@@ -14,6 +14,7 @@ class ConfigStore {
       discordClientId: '',
       discordBotToken: '',
       discordGuildId: '',
+      roflFolderPath: '',
     };
     this.data = this.load();
   }

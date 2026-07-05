@@ -83,7 +83,7 @@
     </section>
 
     <section id="rofl-import-section">
-      <h2>Import z pliku .rofl</h2>
+      <h2>Import z plików .rofl</h2>
       <p>
         Uwaga: sam plik .rofl od patcha 13.20 nie zawiera już szczegółowych
         statystyk (to znany, niezałatany problem po stronie Riota). Import
@@ -92,6 +92,25 @@
         zobaczysz podgląd danych meczu i będziesz mógł zdecydować, czy go
         zaimportować.
       </p>
+
+      <h3>Z folderu Replays (skonfigurowanego w Ustawieniach)</h3>
+      <p>
+        <button id="rofl-scan-folder-btn" type="button">Wczytaj listę z folderu</button>
+        <span id="rofl-folder-result"></span>
+      </p>
+      <table id="rofl-folder-table" border="1">
+        <thead>
+          <tr>
+            <th>Plik</th>
+            <th>Game ID</th>
+            <th>W bazie?</th>
+            <th>Akcje</th>
+          </tr>
+        </thead>
+        <tbody id="rofl-folder-tbody"></tbody>
+      </table>
+
+      <h3>Wybierz plik(i) ręcznie</h3>
       <p>
         <button id="rofl-pick-btn" type="button">Wybierz plik(i) .rofl</button>
         <span id="rofl-import-result"></span>
