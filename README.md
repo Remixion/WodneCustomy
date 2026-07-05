@@ -98,8 +98,22 @@ doimportowanie takiego meczu:
    zwrócić same duplikaty, pokazując ostrzeżenie, że lista może nie sięgać
    aż tak daleko wstecz, jak wybrana data. W obu przypadkach wystarczy
    kliknąć "Importuj" przy wybranym meczu, żeby pobrać dokładnie te same,
-   pełne dane co przy automatycznym
-   przechwytywaniu. Wymaga uruchomionego i zalogowanego klienta League.
+   pełne dane co przy automatycznym przechwytywaniu. Wymaga uruchomionego
+   i zalogowanego klienta League.
+
+   Dodatkowe narzędzia w tej sekcji:
+   - **Pokaż tylko gry custom** - filtruje wczytaną listę do samych gier
+     custom (`gameType = CUSTOM_GAME` / `queueId = 0`), żeby nie przeklikiwać
+     się przez rankedy/normalki wymieszane pomiędzy.
+   - **Sprawdź datę pojedynczego meczu po Game ID** - pokazuje datę i tryb
+     jednej, konkretnej gry bez importowania jej. Przydatne, gdy znasz tylko
+     numer `gameId` skrajnego meczu z jakiegoś okresu (np. z nazwy pliku
+     `.rofl`) i chcesz sprawdzić, od jakiej daty użyć opcji powyżej - `gameId`
+     to globalny licznik dla całego shardu (nie jest powiązany z Twoim
+     kontem ani z datą w żaden przewidywalny sposób), więc **nie da się** po
+     samych numerach ID wywnioskować zakresu dat ani "przeleźć" po kolei
+     wszystkich ID między dwoma znanymi meczami - trzeba zapytać klienta
+     o konkretną datę każdego z osobna.
 2. **Import z plików .rofl** - w zakładce **Ustawienia** wpisz ścieżkę do
    folderu `Replays` klienta League (albo kliknij "Wykryj automatycznie"),
    a w zakładce **Mecze**, sekcja "Import z plików .rofl", kliknij "Wczytaj

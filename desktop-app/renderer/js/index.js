@@ -99,34 +99,48 @@ document.getElementById('push-all-btn').addEventListener('click', async () => {
   logEvent(`Zakończono wysyłkę: ${results.length - failed.length}/${results.length} OK`);
 });
 
+let lastHistoryMatches = [];
+
 async function loadHistoryList(fetchPromise, loadingLabel) {
   const tbody = document.getElementById('history-tbody');
   const statusEl = document.getElementById('history-list-status');
   statusEl.textContent = '';
-  tbody.innerHTML = `<tr><td colspan="6">${loadingLabel}</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="7">${loadingLabel}</td></tr>`;
   let result;
   try {
     result = await fetchPromise;
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="6">Błąd: ${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7">Błąd: ${err.message}</td></tr>`;
     return;
   }
   if (!result.ok) {
-    tbody.innerHTML = `<tr><td colspan="6">Błąd: ${result.error}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7">Błąd: ${result.error}</td></tr>`;
     return;
   }
-  tbody.innerHTML = '';
   statusEl.textContent = `Znaleziono ${result.matches.length} mecz(ów).`;
   if (result.truncated) {
     statusEl.textContent +=
       ' Uwaga: klient League przestał zwracać nowe wyniki wcześniej, niż wynikałoby to z wybranej daty ' +
       '(niestabilność tego lokalnego API) - lista może nie sięgać aż tak daleko wstecz.';
   }
-  if (!result.matches.length) {
-    tbody.innerHTML = '<tr><td colspan="6">Brak meczów w lokalnej historii klienta.</td></tr>';
+  lastHistoryMatches = result.matches;
+  renderHistoryRows();
+}
+
+function renderHistoryRows() {
+  const tbody = document.getElementById('history-tbody');
+  const onlyCustom = document.getElementById('history-only-custom').checked;
+  const matches = onlyCustom ? lastHistoryMatches.filter((m) => m.isCustom) : lastHistoryMatches;
+
+  tbody.innerHTML = '';
+  if (!matches.length) {
+    tbody.innerHTML = `<tr><td colspan="7">${
+      onlyCustom ? 'Brak gier custom na wczytanej liście.' : 'Brak meczów w lokalnej historii klienta.'
+    }</td></tr>`;
     return;
   }
-  result.matches.forEach((m) => {
+
+  matches.forEach((m) => {
     const tr = document.createElement('tr');
     const actionsTd = document.createElement('td');
 
@@ -158,6 +172,7 @@ async function loadHistoryList(fetchPromise, loadingLabel) {
       <td>${m.gameId}</td>
       <td>${formatDate(m.gameCreationDate)}</td>
       <td>${m.gameMode || ''}</td>
+      <td>${m.isCustom ? 'Tak' : 'Nie'}</td>
       <td>${m.mapId || ''}</td>
       <td>${formatDuration(m.gameDurationSec)}</td>
     `;
@@ -165,6 +180,8 @@ async function loadHistoryList(fetchPromise, loadingLabel) {
     tbody.appendChild(tr);
   });
 }
+
+document.getElementById('history-only-custom').addEventListener('change', renderHistoryRows);
 
 /** Zapamiętuje ostatnio użyty sposób wczytania listy (ostatnie N / od daty), żeby odświeżyć nią listę po imporcie. */
 let reloadHistoryList = () => {};
@@ -186,6 +203,26 @@ function loadHistorySince() {
 
 document.getElementById('history-list-btn').addEventListener('click', loadRecentHistory);
 document.getElementById('history-since-btn').addEventListener('click', loadHistorySince);
+
+document.getElementById('history-lookup-btn').addEventListener('click', async () => {
+  const gameId = document.getElementById('history-lookup-gameid').value.trim();
+  const resultEl = document.getElementById('history-lookup-result');
+  if (!gameId) {
+    resultEl.textContent = 'Wpisz najpierw Game ID.';
+    return;
+  }
+  resultEl.textContent = 'Sprawdzanie...';
+  try {
+    const result = await window.api.history.lookupGame(gameId);
+    resultEl.textContent = result.ok
+      ? `${formatDate(result.gameCreationDate)} - ${result.gameMode || result.gameType || 'nieznany tryb'}${
+          result.isCustom ? ' (custom)' : ''
+        }`
+      : `Błąd: ${result.error}`;
+  } catch (err) {
+    resultEl.textContent = `Błąd: ${err.message}`;
+  }
+});
 
 function fileBaseName(filePath) {
   const parts = filePath.split(/[\\/]/);

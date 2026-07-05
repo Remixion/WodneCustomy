@@ -70,11 +70,24 @@
         może się urwać wcześniej, niż faktyczna liczba rozegranych meczów by
         sugerowała, jeśli klient nie trzyma ich już w swoim cache.
       </p>
+      <p>
+        <label for="history-lookup-gameid">Sprawdź datę pojedynczego meczu po Game ID (bez importu):</label>
+        <input type="text" id="history-lookup-gameid" placeholder="np. 3880767863" />
+        <button id="history-lookup-btn" type="button">Sprawdź</button>
+        <span id="history-lookup-result"></span>
+      </p>
+
       <p><button id="history-list-btn" type="button">Wczytaj ostatnie 20 meczów z klienta</button></p>
       <p>
         <label for="history-since-date">albo wszystkie mecze od daty:</label>
         <input type="date" id="history-since-date" />
         <button id="history-since-btn" type="button">Wczytaj mecze od tej daty</button>
+      </p>
+      <p>
+        <label for="history-only-custom">
+          <input type="checkbox" id="history-only-custom" />
+          Pokaż tylko gry custom
+        </label>
       </p>
       <p id="history-list-status"></p>
       <table id="history-table" border="1">
@@ -83,6 +96,7 @@
             <th>Game ID</th>
             <th>Data</th>
             <th>Tryb</th>
+            <th>Custom?</th>
             <th>Mapa</th>
             <th>Czas trwania</th>
             <th>Akcje</th>

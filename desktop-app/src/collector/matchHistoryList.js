@@ -24,6 +24,7 @@ async function fetchGamePage(client, puuid, begIndex, endIndex) {
       gameType: g.gameType || '',
       queueId: g.queueId,
       mapId: g.mapId,
+      isCustom: g.gameType === 'CUSTOM_GAME' || g.queueId === 0,
     }));
 }
 

@@ -342,6 +342,34 @@ ipcMain.handle('history:list-matches-since', async (_evt, sinceDateIso) => {
   }
 });
 
+// Szybkie sprawdzenie daty/typu pojedynczego meczu po Game ID - bez importu,
+// przydatne np. do znalezienia daty najwcześniejszego meczu z jakiegoś zakresu,
+// zamiast zgadywać ją z numeru gameId (gameId to globalny licznik dla całego
+// shardu, nie jest w żaden sposób powiązany z datą ani z Twoim kontem).
+ipcMain.handle('history:lookup-game', async (_evt, gameId) => {
+  try {
+    const client = createOneOffLcuClient();
+    if (!client) return { ok: false, error: 'Klient League of Legends nie jest uruchomiony.' };
+    const data = await client.get(`/lol-match-history/v1/games/${gameId}`);
+    return {
+      ok: true,
+      gameId: String(gameId),
+      gameCreationDate: data.gameCreation ? new Date(data.gameCreation).toISOString() : '',
+      gameDurationSec: data.gameDuration || 0,
+      gameMode: data.gameMode || '',
+      gameType: data.gameType || '',
+      queueId: data.queueId,
+      mapId: data.mapId,
+      isCustom: data.gameType === 'CUSTOM_GAME' || data.queueId === 0,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      error: `${String(err)} (zalogowane konto prawdopodobnie nie brało udziału w tym meczu - historia klienta jest ograniczona do własnych gier)`,
+    };
+  }
+});
+
 ipcMain.handle('history:import-match', async (_evt, gameId) => {
   try {
     const client = createOneOffLcuClient();
