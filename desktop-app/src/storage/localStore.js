@@ -54,6 +54,14 @@ class LocalStore {
       if (!match.notes && existing.match.notes) {
         match.notes = existing.match.notes;
       }
+      // gid (numer z ręcznie prowadzonego arkusza ligi) nie jest znany przez
+      // żaden inny sposób pozyskania danych (żywe przechwytywanie, historia
+      // klienta, skaner) - gdyby taki mecz został later ponownie zaimportowany
+      // stamtąd, nowy obiekt nie ma pola gid w ogóle i bez tego trzeba by je
+      // odtworzyć ręcznie.
+      if (!match.gid && existing.match.gid) {
+        match.gid = existing.match.gid;
+      }
 
       const oldRaw = safeParseJson(existing.match.rawDataJson, {});
       const newRaw = safeParseJson(match.rawDataJson, {});
@@ -87,6 +95,30 @@ class LocalStore {
     const file = path.join(this.matchesDir, `${matchId}.json`);
     if (!fs.existsSync(file)) return null;
     return JSON.parse(fs.readFileSync(file, 'utf8'));
+  }
+
+  /**
+   * Przelicza `gid` (numer porządkowy, 1 = najstarszy mecz) dla WSZYSTKICH
+   * lokalnie zapisanych meczów na podstawie `gameCreationDate` - niezależnie
+   * od źródła (arkusz ligi, żywe przechwytywanie, historia klienta, .rofl,
+   * skaner). Dzięki temu nowo dodany mecz zawsze wskakuje na właściwe
+   * miejsce w chronologii całej ligi, nawet jeśli jego data wypada między
+   * już ponumerowanymi meczami - co oznacza, że gid już istniejących meczów
+   * może się przy tym przesunąć (to zamierzone, nie błąd).
+   * Zwraca listę zmienionych wpisów { matchId, gid }, żeby wywołujący mógł
+   * zsynchronizować z Arkuszem tylko te, które faktycznie się zmieniły.
+   */
+  recomputeAllGids() {
+    const sortedOldestFirst = this.listMatches().reverse();
+    const changed = [];
+    sortedOldestFirst.forEach(({ match }, index) => {
+      const newGid = String(index + 1);
+      if (String(match.gid || '') !== newGid) {
+        this.updateMatchField(match.matchId, 'gid', newGid);
+        changed.push({ matchId: match.matchId, gid: newGid });
+      }
+    });
+    return changed;
   }
 
   updateMatchField(matchId, field, value) {

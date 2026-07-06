@@ -69,6 +69,11 @@ async function processCollectedMatch(client, { match, players }, { autoSyncOverr
   store.saveMatchPreservingData(match, players);
   sendToRenderer('collector:match-saved', { match, players });
 
+  // Nowy/zaktualizowany mecz mógł wypaść chronologicznie między już
+  // ponumerowanymi meczami - przelicz gid wszystkich, żeby dalej
+  // odzwierciedlał kolejność wydarzeń, nie tylko kolejność importu.
+  const gidChanges = store.recomputeAllGids();
+
   const enriched = [];
   for (const p of players) {
     if (!p.puuid) continue;
@@ -86,6 +91,14 @@ async function processCollectedMatch(client, { match, players }, { autoSyncOverr
   const shouldSync = autoSyncOverride !== undefined ? autoSyncOverride : cfg.autoSync;
   let syncResult = null;
   if (shouldSync && cfg.appsScriptUrl) {
+    for (const change of gidChanges) {
+      if (change.matchId === match.matchId) continue; // pojdzie i tak w pelnym syncMatch ponizej
+      await postToAppsScript(cfg.appsScriptUrl, cfg.sharedSecret, 'updateMatchField', {
+        matchId: change.matchId,
+        field: 'gid',
+        value: change.gid,
+      });
+    }
     const matchResult = await syncMatchToSheets(match.matchId);
     const playersResult = await syncPlayersToSheets(enriched);
     syncResult = { matchResult, playersResult };
