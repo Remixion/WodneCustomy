@@ -68,12 +68,15 @@ async function loadMatches() {
       <td>${match.gid || ''}</td>
       <td>${formatDataSource(match.dataSource)}</td>
       <td>${formatDate(match.gameCreationDate)}</td>
-      <td>${match.gameMode || ''}</td>
       <td>${match.mapId || ''}</td>
       <td>${formatDuration(match.gameDurationSec)}</td>
       <td>${match.winningTeam || ''}</td>
       <td>${match.blueBans || ''}</td>
       <td>${match.redBans || ''}</td>
+      <td>${match.blueChampions || ''}</td>
+      <td>${match.redChampions || ''}</td>
+      <td>${match.bluePlayerNames || ''}</td>
+      <td>${match.redPlayerNames || ''}</td>
     `;
     tr.appendChild(notesCell);
     tr.appendChild(actionsCell);
@@ -394,7 +397,9 @@ async function importOneRoflFile(filePath, card) {
   clearRoflPreview();
 }
 
-function renderPlayersPreviewTable(players) {
+async function renderPlayersPreviewTable(players) {
+  const knownPlayers = await window.api.store.refreshPlayersFromSheets();
+  const playersByPuuid = buildPlayersByPuuid(knownPlayers);
   const table = document.createElement('table');
   table.setAttribute('border', '1');
   const thead = document.createElement('thead');
@@ -405,7 +410,7 @@ function renderPlayersPreviewTable(players) {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${p.team || ''}</td>
-      <td>${p.summonerName || ''}</td>
+      <td>${getPlayerDisplayName(p.puuid, playersByPuuid)}</td>
       <td>${p.championName || ''}</td>
       <td>${p.kills}/${p.deaths}/${p.assists}</td>
       <td>${p.kda || ''}</td>
@@ -423,7 +428,7 @@ function clearRoflPreview() {
 }
 
 /** Pokazuje podgląd JEDNEGO meczu na raz w panelu bocznym - zastępuje poprzedni podgląd. */
-function showRoflPreview(r) {
+async function showRoflPreview(r) {
   const container = document.getElementById('rofl-preview-container');
   container.innerHTML = '';
 
@@ -436,7 +441,6 @@ function showRoflPreview(r) {
     const dl = document.createElement('dl');
     dl.innerHTML = `
       <dt>Data</dt><dd>${formatDate(r.match.gameCreationDate)}</dd>
-      <dt>Tryb</dt><dd>${r.match.gameMode || ''}</dd>
       <dt>Mapa</dt><dd>${r.match.mapId || ''}</dd>
       <dt>Czas trwania</dt><dd>${formatDuration(r.match.gameDurationSec)}</dd>
       <dt>Zwycięska drużyna</dt><dd>${r.match.winningTeam || ''}</dd>
@@ -444,7 +448,7 @@ function showRoflPreview(r) {
       <dt>Bany (czerwoni)</dt><dd>${r.match.redBans || ''}</dd>
     `;
     card.appendChild(dl);
-    card.appendChild(renderPlayersPreviewTable(r.players));
+    card.appendChild(await renderPlayersPreviewTable(r.players));
   } else {
     const p = document.createElement('p');
     p.textContent = `Podgląd niedostępny: ${r.error}`;
@@ -502,7 +506,7 @@ async function loadRoflFolderList() {
       previewBtn.textContent = 'Wczytywanie...';
       try {
         const previewResults = await window.api.rofl.preview([f.filePath]);
-        showRoflPreview(previewResults[0]);
+        await showRoflPreview(previewResults[0]);
       } finally {
         previewBtn.disabled = false;
         previewBtn.textContent = 'Podgląd';
@@ -526,7 +530,7 @@ document.getElementById('rofl-pick-btn').addEventListener('click', async () => {
   try {
     const previewResults = await window.api.rofl.preview(filePaths);
     resultEl.textContent = previewResults[0].ok ? 'Podgląd gotowy - sprawdź panel po prawej.' : 'Podgląd niedostępny - sprawdź panel po prawej.';
-    showRoflPreview(previewResults[0]);
+    await showRoflPreview(previewResults[0]);
   } catch (err) {
     resultEl.textContent = `Błąd podglądu: ${err.message}`;
     logEvent(`Podgląd .rofl błąd: ${err.message}`);
@@ -592,7 +596,7 @@ function clearLegacyJsonPreview() {
 }
 
 /** Pokazuje podgląd JEDNEGO meczu na raz w panelu bocznym - zastępuje poprzedni podgląd. */
-function showLegacyJsonPreview(r) {
+async function showLegacyJsonPreview(r) {
   const container = document.getElementById('legacyjson-preview-container');
   container.innerHTML = '';
 
@@ -605,7 +609,6 @@ function showLegacyJsonPreview(r) {
     const dl = document.createElement('dl');
     dl.innerHTML = `
       <dt>Data</dt><dd>${formatDate(r.match.gameCreationDate)}</dd>
-      <dt>Tryb</dt><dd>${r.match.gameMode || ''}</dd>
       <dt>Mapa</dt><dd>${r.match.mapId || ''}</dd>
       <dt>Czas trwania</dt><dd>${formatDuration(r.match.gameDurationSec)}</dd>
       <dt>Zwycięska drużyna</dt><dd>${r.match.winningTeam || ''}</dd>
@@ -613,7 +616,7 @@ function showLegacyJsonPreview(r) {
       <dt>Bany (czerwoni)</dt><dd>${r.match.redBans || ''}</dd>
     `;
     card.appendChild(dl);
-    card.appendChild(renderPlayersPreviewTable(r.players));
+    card.appendChild(await renderPlayersPreviewTable(r.players));
   } else {
     const p = document.createElement('p');
     p.textContent = `Podgląd niedostępny: ${r.error}`;
@@ -671,7 +674,7 @@ async function loadLegacyJsonFolderList() {
       previewBtn.textContent = 'Wczytywanie...';
       try {
         const previewResults = await window.api.legacyJson.preview([f.filePath]);
-        showLegacyJsonPreview(previewResults[0]);
+        await showLegacyJsonPreview(previewResults[0]);
       } finally {
         previewBtn.disabled = false;
         previewBtn.textContent = 'Podgląd';
@@ -695,7 +698,7 @@ document.getElementById('legacyjson-pick-btn').addEventListener('click', async (
   try {
     const previewResults = await window.api.legacyJson.preview(filePaths);
     resultEl.textContent = previewResults[0].ok ? 'Podgląd gotowy - sprawdź panel po prawej.' : 'Podgląd niedostępny - sprawdź panel po prawej.';
-    showLegacyJsonPreview(previewResults[0]);
+    await showLegacyJsonPreview(previewResults[0]);
   } catch (err) {
     resultEl.textContent = `Błąd podglądu: ${err.message}`;
     logEvent(`Podgląd starego JSON błąd: ${err.message}`);

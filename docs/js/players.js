@@ -1,41 +1,88 @@
+// Tylko pola faktycznie obecne w PLAYERS_HEADERS (Code.gs) - w przeciwieństwie
+// do apki desktopowej, ta strona nie ma lokalnego magazynu jako zapasowego
+// miejsca zapisu, więc edycja pola spoza Arkusza (np. notes, Flex, mistrzostwo)
+// nie miałaby się gdzie zapisać i kończyłaby się błędem serwera.
 const PLAYER_FIELDS = [
   'nick', 'color', 'avatarSource', 'discordNick', 'discordAvatarUrl',
   'summonerName', 'summonerId', 'accountId', 'profileIconId', 'summonerLevel',
-  'soloTier', 'soloRank', 'soloLP', 'soloWins', 'soloLosses', 'soloWinRatePct',
-  'flexTier', 'flexRank', 'flexLP', 'flexWins', 'flexLosses', 'flexWinRatePct',
-  'top1ChampionName', 'top1ChampionPoints', 'top2ChampionName', 'top2ChampionPoints',
-  'top3ChampionName', 'top3ChampionPoints', 'totalMasteryScore',
-  'customGamesPlayed', 'customGamesWon', 'customGamesLost',
-  'notes',
+  'soloTier', 'soloRank', 'soloLP', 'soloWins', 'soloLosses',
 ];
 
-async function load() {
-  const statusEl = document.getElementById('status-message');
-  try {
-    const data = await fetchData();
-    statusEl.textContent = `Dane zaktualizowano: ${formatDate(data.generatedAt)} - liczba graczy: ${data.players.length}`;
-    await renderPlayers(data.players);
-  } catch (err) {
-    statusEl.textContent = `Błąd wczytywania danych: ${err.message}`;
+async function renderProfileDetail(puuid, data, individualStats) {
+  const section = document.getElementById('profile-detail-section');
+  const player = (data.players || []).find((p) => p.puuid === puuid);
+  const stats = individualStats.find((s) => s.puuid === puuid);
+
+  if (!player && !stats) {
+    section.hidden = true;
+    return;
   }
+  section.hidden = false;
+
+  const playersByPuuid = buildPlayersByPuuid(data.players);
+  const color = getPlayerColor(player || { puuid });
+  const name = getPlayerDisplayName(puuid, playersByPuuid);
+
+  document.getElementById('profile-name').innerHTML = colorizeName(name, color);
+
+  const avatarImg = document.getElementById('profile-avatar');
+  const iconUrl = await getPlayerAvatarUrl(player);
+  if (iconUrl) avatarImg.src = iconUrl;
+  avatarImg.alt = name;
+
+  const dl = document.getElementById('profile-info-list');
+  dl.innerHTML = `
+    <dt>Nazwa przywoływacza (LoL)</dt><dd>${(player && player.summonerName) || '-'}</dd>
+    <dt>Poziom konta</dt><dd>${(player && player.summonerLevel) || '-'}</dd>
+    <dt>Ranga Solo/Duo</dt><dd>${player && player.soloTier ? `${player.soloTier} ${player.soloRank} (${player.soloLP} LP) - ${player.soloWins}W/${player.soloLosses}L` : 'brak danych'}</dd>
+    <dt>Rozegrane custom gry</dt><dd>${stats ? stats.gamesPlayed : 0}</dd>
+    <dt>Bilans W/L</dt><dd>${stats ? `${stats.wins}W / ${stats.losses}L (${stats.winRatePct.toFixed(1)}%)` : '-'}</dd>
+    <dt>Średnie KDA</dt><dd>${stats ? (stats.avgKda === null ? 'Perfect' : stats.avgKda.toFixed(2)) : '-'} (${stats ? stats.avgKills.toFixed(1) : 0}/${stats ? stats.avgDeaths.toFixed(1) : 0}/${stats ? stats.avgAssists.toFixed(1) : 0})</dd>
+    <dt>Ulubiony champion</dt><dd>${(stats && stats.favoriteChampion) || '-'}</dd>
+    <dt>Ulubiona rola</dt><dd>${(stats && stats.favoriteRole) || '-'}</dd>
+  `;
+
+  const recentMatches = (data.matchPlayers || [])
+    .filter((mp) => mp.puuid === puuid)
+    .map((mp) => ({ mp, match: (data.matches || []).find((m) => String(m.matchId) === String(mp.matchId)) }))
+    .filter((r) => r.match)
+    .sort((a, b) => new Date(b.match.gameCreationDate) - new Date(a.match.gameCreationDate))
+    .slice(0, 10);
+
+  const tbody = document.querySelector('#recent-matches-table tbody');
+  tbody.innerHTML = '';
+  if (!recentMatches.length) {
+    tbody.innerHTML = '<tr><td colspan="8">Brak rozegranych meczów.</td></tr>';
+    return;
+  }
+  recentMatches.forEach(({ mp, match }) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${formatDate(match.gameCreationDate)}</td>
+      <td>${mp.championName || ''}</td>
+      <td>${isWinValue(mp.win) ? 'Wygrana' : 'Przegrana'}</td>
+      <td>${mp.kills}/${mp.deaths}/${mp.assists}</td>
+      <td>${mp.kda || ''}</td>
+      <td>${mp.cs != null ? mp.cs : ''}</td>
+      <td>${mp.damageDealtToChampions != null ? mp.damageDealtToChampions : ''}</td>
+      <td><a href="match.html?matchId=${encodeURIComponent(match.matchId)}">Szczegóły</a></td>
+    `;
+    tbody.appendChild(tr);
+  });
 }
 
-async function renderPlayers(players) {
+async function renderPlayersTable(players, individualStatsByPuuid) {
   const thead = document.querySelector('#players-table thead');
   const tbody = document.querySelector('#players-table tbody');
   thead.innerHTML = '';
   tbody.innerHTML = '';
 
   const headRow = document.createElement('tr');
-  const avatarTh = document.createElement('th');
-  avatarTh.textContent = 'Avatar';
-  headRow.appendChild(avatarTh);
-  const previewTh = document.createElement('th');
-  previewTh.textContent = 'Podgląd';
-  headRow.appendChild(previewTh);
-  const cornerTh = document.createElement('th');
-  cornerTh.textContent = 'puuid';
-  headRow.appendChild(cornerTh);
+  ['Avatar', 'Podgląd', 'puuid', 'Gry', '% wygranych'].forEach((label) => {
+    const th = document.createElement('th');
+    th.textContent = label;
+    headRow.appendChild(th);
+  });
   PLAYER_FIELDS.forEach((f) => {
     const th = document.createElement('th');
     th.textContent = f;
@@ -47,11 +94,12 @@ async function renderPlayers(players) {
   thead.appendChild(headRow);
 
   if (!players.length) {
-    tbody.innerHTML = `<tr><td colspan="${PLAYER_FIELDS.length + 4}">Brak zapisanych graczy.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${PLAYER_FIELDS.length + 6}">Brak zapisanych graczy.</td></tr>`;
     return;
   }
 
   for (const player of players) {
+    const stats = individualStatsByPuuid[player.puuid];
     const tr = document.createElement('tr');
 
     const avatarTd = document.createElement('td');
@@ -65,67 +113,54 @@ async function renderPlayers(players) {
     tr.appendChild(avatarTd);
 
     const previewTd = document.createElement('td');
-    previewTd.innerHTML = colorizeName(player.nick || player.summonerName || player.puuid, getPlayerColor(player));
+    previewTd.innerHTML = colorizeName(displayNameForPlayer(player), getPlayerColor(player));
     tr.appendChild(previewTd);
 
     const puuidTd = document.createElement('td');
     puuidTd.textContent = player.puuid ? String(player.puuid).slice(0, 8) + '...' : '';
     tr.appendChild(puuidTd);
 
+    const gamesTd = document.createElement('td');
+    gamesTd.textContent = stats ? stats.gamesPlayed : 0;
+    tr.appendChild(gamesTd);
+
+    const winrateTd = document.createElement('td');
+    winrateTd.textContent = stats ? stats.winRatePct.toFixed(1) + '%' : '-';
+    tr.appendChild(winrateTd);
+
     PLAYER_FIELDS.forEach((field) => {
       const td = document.createElement('td');
-      let input;
-      if (field === 'avatarSource') {
-        input = document.createElement('select');
-        [['lol', 'League of Legends'], ['discord', 'Discord']].forEach(([value, label]) => {
-          const option = document.createElement('option');
-          option.value = value;
-          option.textContent = label;
-          if ((player.avatarSource || 'lol') === value) option.selected = true;
-          input.appendChild(option);
-        });
-      } else {
-        input = document.createElement('input');
-        input.type = 'text';
-        input.value = player[field] != null ? player[field] : '';
-        input.size = field === 'summonerName' || field === 'nick' ? 20 : 8;
-        if (field === 'color') input.placeholder = '#rrggbb (puste = kolor domyślny z palety)';
-        if (field === 'discordNick') input.placeholder = 'nazwa użytkownika lub nick na serwerze Discord';
-        if (field === 'discordAvatarUrl') input.placeholder = 'link do avatara Discord (ręcznie lub z apki desktopowej)';
-      }
-      input.addEventListener('change', async () => {
-        try {
-          await postAction('updatePlayerField', { puuid: player.puuid, field, value: input.value });
-          logEvent(`Zapisano ${field} dla ${player.summonerName || player.puuid}`);
-          if (['nick', 'color', 'avatarSource', 'discordAvatarUrl', 'profileIconId'].includes(field)) load();
-        } catch (err) {
-          logEvent(`Błąd zapisu ${field}: ${err.message}`);
-        }
-      });
-      td.appendChild(input);
+      td.textContent = player[field] != null ? player[field] : '';
       tr.appendChild(td);
     });
 
     const actionsTd = document.createElement('td');
-    const deleteBtn = document.createElement('button');
-    deleteBtn.type = 'button';
-    deleteBtn.textContent = 'Usuń z Sheets';
-    deleteBtn.addEventListener('click', async () => {
-      if (!confirm(`Usunąć gracza ${player.nick || player.summonerName || player.puuid} z Arkusza Google?`)) return;
-      deleteBtn.disabled = true;
-      try {
-        await postAction('deletePlayer', { puuid: player.puuid });
-        logEvent(`Usunięto gracza ${player.summonerName || player.puuid} z Sheets`);
-        load();
-      } catch (err) {
-        logEvent(`Błąd usuwania gracza: ${err.message}`);
-        deleteBtn.disabled = false;
-      }
-    });
-    actionsTd.appendChild(deleteBtn);
+    const profileLink = document.createElement('a');
+    profileLink.href = `players.html?puuid=${encodeURIComponent(player.puuid)}`;
+    profileLink.textContent = 'Profil';
+    actionsTd.appendChild(profileLink);
     tr.appendChild(actionsTd);
 
     tbody.appendChild(tr);
+  }
+}
+
+async function load() {
+  const statusEl = document.getElementById('status-message');
+  try {
+    const data = await fetchData();
+    statusEl.textContent = `Dane zaktualizowano: ${formatDate(data.generatedAt)} - liczba graczy: ${data.players.length}`;
+
+    const playersByPuuid = buildPlayersByPuuid(data.players);
+    const individualStats = computeIndividualStats(data.matchPlayers, playersByPuuid);
+    const individualStatsByPuuid = {};
+    individualStats.forEach((s) => (individualStatsByPuuid[s.puuid] = s));
+
+    const puuid = qs('puuid');
+    await renderProfileDetail(puuid, data, individualStats);
+    await renderPlayersTable(data.players || [], individualStatsByPuuid);
+  } catch (err) {
+    statusEl.textContent = `Błąd wczytywania danych: ${err.message}`;
   }
 }
 

@@ -15,16 +15,39 @@ var SHEET_MATCH_PLAYERS = 'MatchPlayers';
 var SHEET_PLAYERS = 'Players';
 
 var MATCHES_HEADERS = [
-  'gid', 'matchId', 'dataSource', 'gameCreationDate', 'gameDurationSec', 'gameMode', 'gameType',
-  'mapId', 'queueId', 'gameVersion', 'winningTeam',
-  'blueBans', 'redBans',
+  'gid', 'matchId', 'dataSource', 'gameCreationDate', 'gameDurationSec',
+  'mapId', 'patch', 'winningTeam',
+  'blueBans', 'redBans', 'blueChampions', 'redChampions', 'bluePlayerNames', 'redPlayerNames',
   'blueBaronKills', 'blueDragonKills', 'blueHeraldKills', 'blueTowerKills', 'blueInhibKills',
   'redBaronKills', 'redDragonKills', 'redHeraldKills', 'redTowerKills', 'redInhibKills',
-  'notes', 'rawDataJson', 'createdAt', 'updatedAt'
+  'notes', 'rawDataJson'
 ];
 
+/** Limit długości komórki w Google Sheets to ok. 50000 znaków - powyżej zapis się nie udaje. */
+var RAW_DATA_JSON_MAX_LENGTH = 49000;
+
+/**
+ * Ujednolica wartość przed zapisem do konkretnej kolumny:
+ * - gameCreationDate jako prawdziwy obiekt Date (natywne formatowanie/sortowanie
+ *   w Sheets), zamiast surowego stringa ISO - JSON.stringify w doGet i tak
+ *   zserializuje go z powrotem do ISO 8601, więc odczyt się nie zmienia;
+ * - rawDataJson zbyt długi na komórkę Sheets (limit ok. 50000 znaków) zostaje
+ *   zastąpiony małym markerem zamiast ucinać i zostawiać nieprawidłowy JSON -
+ *   pełne dane są wciąż dostępne w lokalnym pliku meczu.
+ */
+function coerceCellValue_(field, value) {
+  if (field === 'gameCreationDate' && value) {
+    var d = new Date(value);
+    if (!isNaN(d.getTime())) return d;
+  }
+  if (field === 'rawDataJson' && typeof value === 'string' && value.length > RAW_DATA_JSON_MAX_LENGTH) {
+    return JSON.stringify({ tooLargeForSheets: true, length: value.length });
+  }
+  return value;
+}
+
 var MATCH_PLAYERS_HEADERS = [
-  'matchId', 'team', 'puuid', 'summonerName', 'championName', 'championId', 'teamPosition',
+  'gid', 'matchId', 'team', 'puuid', 'summonerName', 'championName', 'championId', 'teamPosition',
   'spell1', 'spell2', 'primaryRuneStyle', 'subRuneStyle', 'keystone', 'champLevel',
   'kills', 'deaths', 'assists', 'kda', 'cs', 'csPerMin',
   'goldEarned', 'damageDealtToChampions', 'damageTaken', 'damageSelfMitigated', 'totalHeal',
@@ -38,12 +61,7 @@ var PLAYERS_HEADERS = [
   'puuid', 'nick', 'color', 'avatarSource', 'discordNick',
   'discordUserId', 'discordAvatarHash', 'discordAvatarUrl',
   'summonerName', 'summonerId', 'accountId', 'profileIconId', 'summonerLevel',
-  'soloTier', 'soloRank', 'soloLP', 'soloWins', 'soloLosses', 'soloWinRatePct',
-  'flexTier', 'flexRank', 'flexLP', 'flexWins', 'flexLosses', 'flexWinRatePct',
-  'top1ChampionName', 'top1ChampionPoints', 'top2ChampionName', 'top2ChampionPoints',
-  'top3ChampionName', 'top3ChampionPoints', 'totalMasteryScore',
-  'customGamesPlayed', 'customGamesWon', 'customGamesLost',
-  'notes', 'updatedAt'
+  'soloTier', 'soloRank', 'soloLP', 'soloWins', 'soloLosses'
 ];
 
 /** Kolumny, których automatyczna synchronizacja NIGDY nie nadpisuje (ręcznie edytowane). */
@@ -100,7 +118,7 @@ function upsertRow_(sheet, headers, keyFields, obj, protectedFields) {
   if (rowIndex === -1) {
     var newRow = headers.map(function (h) {
       if (h === 'createdAt' || h === 'updatedAt') return now;
-      return obj.hasOwnProperty(h) ? obj[h] : '';
+      return obj.hasOwnProperty(h) ? coerceCellValue_(h, obj[h]) : '';
     });
     sheet.appendRow(newRow);
   } else {
@@ -109,7 +127,7 @@ function upsertRow_(sheet, headers, keyFields, obj, protectedFields) {
       if (protectedFields && protectedFields.indexOf(h) !== -1) return existing[i];
       if (h === 'updatedAt') return now;
       if (h === 'createdAt') return existing[i] || now;
-      return obj.hasOwnProperty(h) ? obj[h] : existing[i];
+      return obj.hasOwnProperty(h) ? coerceCellValue_(h, obj[h]) : existing[i];
     });
     sheet.getRange(rowIndex, 1, 1, headers.length).setValues([updated]);
   }
@@ -120,7 +138,7 @@ function updateField_(sheet, headers, keyFields, keyValues, field, value) {
   if (rowIndex === -1) return false;
   var colIndex = headers.indexOf(field);
   if (colIndex === -1) return false;
-  sheet.getRange(rowIndex, colIndex + 1).setValue(value);
+  sheet.getRange(rowIndex, colIndex + 1).setValue(coerceCellValue_(field, value));
   var updatedAtCol = headers.indexOf('updatedAt');
   if (updatedAtCol !== -1) {
     sheet.getRange(rowIndex, updatedAtCol + 1).setValue(new Date().toISOString());
@@ -145,6 +163,56 @@ function deleteRowsByKey_(sheet, headers, keyField, keyValue) {
       sheet.deleteRow(r + 2);
     }
   }
+}
+
+/** Ustawia tę samą wartość pola we WSZYSTKICH wierszach MatchPlayers danego meczu (np. gid po globalnym przeliczeniu). */
+function cascadeFieldToMatchPlayers_(sheet, matchId, field, value) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+  var matchIdCol = MATCH_PLAYERS_HEADERS.indexOf('matchId');
+  var fieldCol = MATCH_PLAYERS_HEADERS.indexOf(field);
+  if (matchIdCol === -1 || fieldCol === -1) return;
+  var values = sheet.getRange(2, 1, lastRow - 1, MATCH_PLAYERS_HEADERS.length).getValues();
+  for (var r = 0; r < values.length; r++) {
+    if (String(values[r][matchIdCol]) === String(matchId)) {
+      sheet.getRange(r + 2, fieldCol + 1).setValue(value);
+    }
+  }
+}
+
+function isBlueLikeSide_(team) {
+  return team === 'BLUE' || team === 'LEFT';
+}
+function isRedLikeSide_(team) {
+  return team === 'RED' || team === 'RIGHT';
+}
+
+/**
+ * Buduje listę nicków (do kolumn Matches.bluePlayerNames/redPlayerNames) na
+ * podstawie AKTUALNEJ zawartości podarkusza Players - nie tego, co akurat
+ * wysłała apka - żeby ręczna zmiana nicku bezpośrednio w Arkuszu Players była
+ * od razu źródłem prawdy przy każdej kolejnej synchronizacji meczu, bez
+ * względu na to, czy lokalny cache apki desktopowej zdążył się już odświeżyć.
+ * Gdy dany gracz nie ma jeszcze przypisanego nicku w Players, zostaje surowe
+ * summonerName z tego meczu (np. "Cytrysia#UwU"). Mecze z arkusza ligi (bez
+ * znanej realnej strony Blue/Red) mają team="LEFT"/"RIGHT" - sideFilterFn
+ * traktuje LEFT jak BLUE i RIGHT jak RED wyłącznie na potrzeby tego
+ * wygodnego podziału kolumn, bez zmiany samego pola team/winningTeam.
+ */
+function resolvePlayerNamesFromPlayersSheet_(playersSheet, matchPlayers, sideFilterFn) {
+  var players = sheetToObjects_(playersSheet, PLAYERS_HEADERS);
+  var byPuuid = {};
+  players.forEach(function (p) {
+    if (p.puuid) byPuuid[p.puuid] = p;
+  });
+  return (matchPlayers || [])
+    .filter(function (mp) { return sideFilterFn(mp.team); })
+    .map(function (mp) {
+      var known = mp.puuid && byPuuid[mp.puuid];
+      return (known && known.nick) || mp.summonerName || '';
+    })
+    .filter(function (v) { return v; })
+    .join(', ');
 }
 
 function checkToken_(token) {
@@ -196,8 +264,19 @@ function doPost(e) {
     switch (action) {
       case 'syncMatch': {
         // payload: { match: {...}, players: [ {...matchPlayer}, ... ] }
+        if (payload.match) {
+          payload.match.bluePlayerNames = resolvePlayerNamesFromPlayersSheet_(playersSheet, payload.players, isBlueLikeSide_);
+          payload.match.redPlayerNames = resolvePlayerNamesFromPlayersSheet_(playersSheet, payload.players, isRedLikeSide_);
+        }
         upsertRow_(matchesSheet, MATCHES_HEADERS, ['matchId'], payload.match, PROTECTED_ON_SYNC);
+        var byPuuidForNick_ = {};
+        sheetToObjects_(playersSheet, PLAYERS_HEADERS).forEach(function (p) {
+          if (p.puuid) byPuuidForNick_[p.puuid] = p;
+        });
         (payload.players || []).forEach(function (p) {
+          p.gid = payload.match ? payload.match.gid : p.gid;
+          var known = p.puuid && byPuuidForNick_[p.puuid];
+          p.summonerName = (known && known.nick) || p.summonerName;
           upsertRow_(matchPlayersSheet, MATCH_PLAYERS_HEADERS, ['matchId', 'puuid'], p, PROTECTED_ON_SYNC);
         });
         return jsonOutput_({ ok: true });
@@ -212,6 +291,13 @@ function doPost(e) {
       case 'updateMatchField': {
         // payload: { matchId, field, value }
         var ok1 = updateField_(matchesSheet, MATCHES_HEADERS, ['matchId'], [payload.matchId], payload.field, payload.value);
+        // gid bywa przeliczany globalnie po dodaniu starszego meczu (patrz
+        // recomputeAllGids w apce desktopowej) - żeby MatchPlayers.gid nie
+        // zostało w tyle, przy każdej takiej zmianie kaskadujemy ją też na
+        // wszystkie wiersze graczy tego meczu.
+        if (payload.field === 'gid') {
+          cascadeFieldToMatchPlayers_(matchPlayersSheet, payload.matchId, 'gid', payload.value);
+        }
         return jsonOutput_({ ok: ok1 });
       }
       case 'updateMatchPlayerField': {

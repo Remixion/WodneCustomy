@@ -102,7 +102,7 @@ async function load() {
   const statusEl = document.getElementById('status-message');
   try {
     const storedMatches = await window.api.store.listMatches();
-    const players = await window.api.store.listPlayers();
+    const players = await window.api.store.refreshPlayersFromSheets();
     const matches = storedMatches.map((m) => m.match);
     const matchPlayers = storedMatches.reduce((acc, m) => acc.concat(m.players), []);
     statusEl.textContent = `Mecze zapisane lokalnie: ${matches.length}`;

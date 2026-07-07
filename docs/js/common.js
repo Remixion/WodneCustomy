@@ -1,13 +1,14 @@
+// Strona jest tylko do odczytu - edycja danych odbywa się w apce desktopowej,
+// więc tu wystarczy sam adres URL (bez SHARED_SECRET, który służy wyłącznie
+// do autoryzacji zapisu przez doPost).
 function getConfig() {
   return {
-    appsScriptUrl: localStorage.getItem('appsScriptUrl') || '',
-    sharedSecret: localStorage.getItem('sharedSecret') || '',
+    appsScriptUrl: localStorage.getItem('appsScriptUrl') || (typeof DEFAULT_APPS_SCRIPT_URL !== 'undefined' ? DEFAULT_APPS_SCRIPT_URL : ''),
   };
 }
 
 function setConfig(cfg) {
   localStorage.setItem('appsScriptUrl', cfg.appsScriptUrl || '');
-  localStorage.setItem('sharedSecret', cfg.sharedSecret || '');
 }
 
 async function fetchData() {
@@ -17,19 +18,6 @@ async function fetchData() {
   const json = await res.json();
   if (!json.ok) throw new Error(json.error || 'Nieznany błąd serwera.');
   return json.data;
-}
-
-async function postAction(action, payload) {
-  const { appsScriptUrl, sharedSecret } = getConfig();
-  if (!appsScriptUrl) throw new Error('Brak skonfigurowanego adresu URL Apps Script. Przejdź do zakładki Ustawienia.');
-  const res = await fetch(appsScriptUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ token: sharedSecret, action, payload }),
-  });
-  const json = await res.json();
-  if (!json.ok) throw new Error(json.error || 'Nieznany błąd serwera.');
-  return json;
 }
 
 function logEvent(message) {
@@ -68,7 +56,7 @@ const DATA_SOURCE_LABELS = {
   'lcu-history': 'Historia klienta League',
   'rofl-stats': 'Statystyki z pliku .rofl',
   'legacy-json': 'Stary plik JSON',
-  'league-sheet': 'Arkusz ligi (ręcznie wpisane)',
+  manual: 'Arkusz ligi (ręcznie wpisane)',
   placeholder: 'Brak danych (tylko ID)',
 };
 
@@ -107,7 +95,7 @@ function sortTeamValues(teams) {
   });
 }
 
-// ---- Statystyki pomocnicze (współdzielone przez stats.js / profile.js) ----
+// ---- Statystyki pomocnicze (współdzielone przez stats.js / players.js) ----
 
 function numberOr(value, fallback = 0) {
   const n = Number(value);
@@ -142,12 +130,26 @@ function mostFrequent(values) {
   return { value: best, count: bestCount };
 }
 
-function getPlayerDisplayName(puuid, summonerNameFallback, playersByPuuid) {
+function shortenPuuid(puuid) {
+  return puuid ? String(puuid).slice(0, 8) + '...' : 'nieznany';
+}
+
+/**
+ * Nick jest jedyną nazwą pokazywaną w większości apki - surowe summonerName
+ * (prawdziwe Riot ID) pojawia się celowo tylko w Profilu i Losowaniu, zawsze
+ * obok nicku, nigdy zamiast niego. Gdy nick nie jest jeszcze przypisany, tutaj
+ * pokazujemy skrócone puuid, a NIE summonerName.
+ */
+function getPlayerDisplayName(puuid, playersByPuuid) {
   const p = playersByPuuid[puuid];
   if (p && p.nick) return p.nick;
-  if (p && p.summonerName) return p.summonerName;
-  if (summonerNameFallback) return summonerNameFallback;
-  return puuid ? String(puuid).slice(0, 8) + '...' : 'nieznany';
+  return shortenPuuid(puuid);
+}
+
+/** Jak getPlayerDisplayName, ale gdy obiekt gracza jest już w ręku (bez potrzeby mapy puuid->gracz). */
+function displayNameForPlayer(player) {
+  if (player && player.nick) return player.nick;
+  return shortenPuuid(player && player.puuid);
 }
 
 // ---- Kolor gracza (paleta + przypisanie deterministyczne po puuid) ----

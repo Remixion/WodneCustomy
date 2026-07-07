@@ -168,6 +168,38 @@ ipcMain.handle('store:delete-match', (_evt, matchId) => store.deleteMatch(matchI
 ipcMain.handle('store:list-players', () => store.listPlayers());
 ipcMain.handle('store:update-player-field', (_evt, { puuid, field, value }) => store.updatePlayerField(puuid, field, value));
 ipcMain.handle('store:delete-player', (_evt, puuid) => store.deletePlayer(puuid));
+ipcMain.handle('store:add-player', async (_evt, { nick, color, summonerName }) => {
+  try {
+    const player = store.addPlayer({ nick, color, summonerName });
+    const cfg = configStore.getAll();
+    if (cfg.autoSync && cfg.appsScriptUrl) {
+      await syncPlayersToSheets([player]);
+    }
+    return { ok: true, player };
+  } catch (err) {
+    return { ok: false, error: String(err.message || err) };
+  }
+});
+/**
+ * Ściąga aktualne dane z podarkusza Players (np. nick wpisany ręcznie w
+ * Sheets) do lokalnego cache przed pokazaniem list graczy w UI - bez tego
+ * apka desktopowa pokazywałaby nieaktualny (pusty) nick, dopóki dany gracz
+ * nie zostałby ponownie wzbogacony przez LCU. Przy braku połączenia z
+ * Arkuszem po prostu zwraca dotychczasowe dane lokalne.
+ */
+ipcMain.handle('store:refresh-players-from-sheets', async () => {
+  const cfg = configStore.getAll();
+  if (!cfg.appsScriptUrl) return store.listPlayers();
+  try {
+    const remote = await getFromAppsScript(cfg.appsScriptUrl);
+    if (remote.ok && remote.data && remote.data.players) {
+      return store.mergeFromRemotePlayers(remote.data.players);
+    }
+  } catch (err) {
+    // brak połączenia z Arkuszem - pracuj na danych lokalnych
+  }
+  return store.listPlayers();
+});
 
 // ---- IPC: synchronizacja z Google Sheets ----
 ipcMain.handle('sync:push-match', (_evt, matchId) => syncMatchToSheets(matchId));
@@ -605,15 +637,14 @@ ipcMain.handle('rofl:import', async (_evt, filePaths) => {
         matchId: gameId,
         dataSource: 'placeholder',
         gameCreationDate: stat.mtime.toISOString(),
-        gameDurationSec: '',
-        gameMode: '',
-        gameType: '',
+        gameDurationSec: '-',
         mapId: '',
-        queueId: '',
-        gameVersion: '',
+        patch: '',
         winningTeam: '',
         blueBans: '',
         redBans: '',
+        blueChampions: '',
+        redChampions: '',
         blueBaronKills: 0,
         blueDragonKills: 0,
         blueHeraldKills: 0,

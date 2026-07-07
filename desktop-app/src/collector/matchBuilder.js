@@ -16,6 +16,52 @@ function toPatchVersion(version) {
   return parts.length >= 2 ? `${parts[0]}.${parts[1]}` : String(version);
 }
 
+/** Skrótowe nazwy map League of Legends (dla szybkiego podglądu zamiast gołego numeru mapId). */
+const MAP_SHORT_NAMES = {
+  1: 'SR',
+  2: 'SR',
+  3: 'PG',
+  4: 'TT',
+  8: 'CS',
+  10: 'TT',
+  11: 'SR',
+  12: 'HA',
+  14: 'BB',
+  16: 'CR',
+  18: 'VCP',
+  19: 'S43',
+  20: 'CSITE',
+  21: 'NB',
+  30: 'AR',
+};
+
+function mapIdToShortName(mapId) {
+  if (mapId === '' || mapId === null || mapId === undefined) return '';
+  return MAP_SHORT_NAMES[Number(mapId)] || `#${mapId}`;
+}
+
+/** Buduje jedną, czytelną listę (rozdzielaną przecinkami) z pola graczy - do szybkiego podglądu w arkuszu. */
+function summarizeList(players, field) {
+  return players
+    .map((p) => p[field])
+    .filter(Boolean)
+    .join(', ');
+}
+
+/**
+ * Jak summarizeList, ale tylko dla graczy jednej strony - do podziału kolumn
+ * blueChampions/redChampions w Arkuszu. Mecze z arkusza ligi (bez znanej
+ * realnej strony Blue/Red) mają team="LEFT"/"RIGHT" - traktujemy LEFT jak
+ * BLUE i RIGHT jak RED wyłącznie na potrzeby tego wygodnego podziału, bez
+ * zmiany samego pola team/winningTeam.
+ */
+function summarizeListForSide(players, side, field) {
+  const isBlueLike = (team) => team === 'BLUE' || team === 'LEFT';
+  const isRedLike = (team) => team === 'RED' || team === 'RIGHT';
+  const matchesSide = side === 'BLUE' ? isBlueLike : isRedLike;
+  return summarizeList(players.filter((p) => matchesSide(p.team)), field);
+}
+
 /**
  * Odtwarza rolę gracza z pary timeline.lane + timeline.role (fallback, gdy
  * eogStatsBlock/detectedTeamPosition nie jest dostępny - czyli przy imporcie
@@ -155,12 +201,9 @@ async function buildMatchFromGameId(
     matchId: String(gameId),
     dataSource,
     gameCreationDate: new Date(matchHistory.gameCreation).toISOString(),
-    gameDurationSec: matchHistory.gameDuration,
-    gameMode: matchHistory.gameMode,
-    gameType: matchHistory.gameType,
-    mapId: matchHistory.mapId,
-    queueId: matchHistory.queueId,
-    gameVersion: toPatchVersion(matchHistory.gameVersion),
+    gameDurationSec: matchHistory.gameDuration || '-',
+    mapId: mapIdToShortName(matchHistory.mapId),
+    patch: toPatchVersion(matchHistory.gameVersion),
     winningTeam,
     blueBans: bansToNames(blueTeam),
     redBans: bansToNames(redTeam),
@@ -243,6 +286,9 @@ async function buildMatchFromGameId(
 
   resolveDuplicateJungles(players);
 
+  match.blueChampions = summarizeListForSide(players, 'BLUE', 'championName');
+  match.redChampions = summarizeListForSide(players, 'RED', 'championName');
+
   return { match, players };
 }
 
@@ -267,4 +313,7 @@ module.exports = {
   normalizeTeamPosition,
   resolveDuplicateJungles,
   toPatchVersion,
+  mapIdToShortName,
+  summarizeList,
+  summarizeListForSide,
 };

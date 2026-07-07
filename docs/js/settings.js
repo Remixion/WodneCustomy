@@ -1,14 +1,12 @@
 function load() {
   const cfg = getConfig();
   document.getElementById('appsScriptUrl').value = cfg.appsScriptUrl;
-  document.getElementById('sharedSecret').value = cfg.sharedSecret;
 }
 
 document.getElementById('settings-form').addEventListener('submit', (evt) => {
   evt.preventDefault();
   setConfig({
     appsScriptUrl: document.getElementById('appsScriptUrl').value.trim(),
-    sharedSecret: document.getElementById('sharedSecret').value.trim(),
   });
   logEvent('Zapisano ustawienia');
 });

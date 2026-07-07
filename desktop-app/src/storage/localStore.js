@@ -35,8 +35,39 @@ class LocalStore {
   }
 
   saveMatch(match, players) {
+    match.bluePlayerNames = this.resolvePlayerNamesSummaryForSide(players, 'BLUE');
+    match.redPlayerNames = this.resolvePlayerNamesSummaryForSide(players, 'RED');
     const file = path.join(this.matchesDir, `${match.matchId}.json`);
     fs.writeFileSync(file, JSON.stringify({ match, players }, null, 2), 'utf8');
+  }
+
+  /**
+   * Buduje listę nicków (nie prawdziwych kont Riot) do szybkiego podglądu w
+   * Arkuszu, osobno dla każdej strony - preferuje `nick` przypisany graczowi w
+   * podarkuszu Players (np. "Resek"), a dopiero gdy go brak, zwraca surowe
+   * summonerName z tego meczu (np. "Cytrysia#UwU"), tak samo jak robi to
+   * getPlayerDisplayName w UI. Mecze z arkusza ligi (bez znanej realnej strony
+   * Blue/Red) mają team="LEFT"/"RIGHT" - traktujemy LEFT jak BLUE i RIGHT jak
+   * RED wyłącznie na potrzeby tego wygodnego podziału kolumn, bez zmiany
+   * samego pola team/winningTeam.
+   */
+  resolvePlayerNamesSummaryForSide(players, side) {
+    const allPlayers = this.listPlayers();
+    const byPuuid = {};
+    allPlayers.forEach((p) => {
+      if (p.puuid) byPuuid[p.puuid] = p;
+    });
+    const isBlueLike = (team) => team === 'BLUE' || team === 'LEFT';
+    const isRedLike = (team) => team === 'RED' || team === 'RIGHT';
+    const matchesSide = side === 'BLUE' ? isBlueLike : isRedLike;
+    return (players || [])
+      .filter((p) => matchesSide(p.team))
+      .map((p) => {
+        const known = p.puuid && byPuuid[p.puuid];
+        return (known && known.nick) || p.summonerName || '';
+      })
+      .filter(Boolean)
+      .join(', ');
   }
 
   /**
@@ -150,6 +181,26 @@ class LocalStore {
     return JSON.parse(fs.readFileSync(this.playersFile, 'utf8'));
   }
 
+  /**
+   * Ręcznie dodaje gracza, który jeszcze nie rozegrał żadnego meczu (np. do
+   * narzędzia losowania składu) - bez prawdziwego konta League dostaje
+   * syntetyczne puuid "nick:<nick>", tak samo jak gracze z importu starego
+   * arkusza ligi (patrz leagueSheetParser.js).
+   */
+  addPlayer({ nick, color, summonerName }) {
+    const trimmedNick = (nick || '').trim();
+    if (!trimmedNick) throw new Error('Nick nie może być pusty.');
+    const puuid = `nick:${trimmedNick.toLowerCase()}`;
+    const players = this.listPlayers();
+    if (players.some((p) => p.puuid === puuid)) {
+      throw new Error(`Gracz o nicku "${trimmedNick}" już istnieje.`);
+    }
+    const player = { puuid, nick: trimmedNick, color: color || '', summonerName: summonerName || '' };
+    players.push(player);
+    fs.writeFileSync(this.playersFile, JSON.stringify(players, null, 2), 'utf8');
+    return player;
+  }
+
   /** Scala nowo pobrane dane profilu z istniejącymi wpisami, zachowując ręczne notatki, nick i kolor. */
   upsertPlayers(freshPlayers) {
     const existing = this.listPlayers();
@@ -158,6 +209,29 @@ class LocalStore {
     freshPlayers.forEach((p) => {
       const prev = byPuuid[p.puuid] || {};
       byPuuid[p.puuid] = { ...prev, ...p, notes: prev.notes || '', nick: prev.nick || '', color: prev.color || '' };
+    });
+    const merged = Object.values(byPuuid);
+    fs.writeFileSync(this.playersFile, JSON.stringify(merged, null, 2), 'utf8');
+    return merged;
+  }
+
+  /**
+   * Wciąga do lokalnego cache zmiany zrobione bezpośrednio w Arkuszu Players
+   * (np. nick wpisany ręcznie w Sheets) - w przeciwną stronę niż zwykły sync,
+   * który tylko wypycha lokalne dane w górę. Bez tego apka desktopowa
+   * pokazywałaby nieaktualny (pusty) nick, dopóki ten gracz nie zostałby
+   * ponownie wzbogacony przez LCU. Arkusz wygrywa dla pól, które faktycznie
+   * zawiera (nick, kolor, Riot ID, ranga Solo...) - pola dostępne tylko
+   * lokalnie (Flex, mistrzostwo, custom gry, notatki - usunięte z Arkusza przy
+   * porządkowaniu kolumn) zostają nietknięte, bo remotePlayers ich w ogóle nie ma.
+   */
+  mergeFromRemotePlayers(remotePlayers) {
+    const local = this.listPlayers();
+    const byPuuid = {};
+    local.forEach((p) => (byPuuid[p.puuid] = p));
+    (remotePlayers || []).forEach((remote) => {
+      if (!remote.puuid) return;
+      byPuuid[remote.puuid] = { ...(byPuuid[remote.puuid] || { puuid: remote.puuid }), ...remote };
     });
     const merged = Object.values(byPuuid);
     fs.writeFileSync(this.playersFile, JSON.stringify(merged, null, 2), 'utf8');

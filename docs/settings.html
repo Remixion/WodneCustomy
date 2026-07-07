@@ -12,8 +12,8 @@
       <ul>
         <li><a href="index.html">Mecze</a></li>
         <li><a href="players.html">Gracze</a></li>
+        <li><a href="randomizer.html">Losowanie</a></li>
         <li><a href="stats.html">Statystyki</a></li>
-        <li><a href="profile.html">Profile</a></li>
         <li><a href="settings.html">Ustawienia</a></li>
       </ul>
     </nav>
@@ -23,8 +23,11 @@
     <section id="settings-section">
       <h2>Ustawienia</h2>
       <p>
-        Te ustawienia są zapisywane wyłącznie w Twojej przeglądarce (localStorage) -
-        nie są nigdzie wysyłane poza Twój Arkusz Google.
+        Ta strona jest tylko do odczytu - edycja danych odbywa się w apce desktopowej.
+        Domyślny adres URL Apps Script jest wbudowany w stronę, więc dane wczytują się
+        od razu, nawet bez zapisanych ustawień (np. w trybie incognito). Poniżej możesz
+        podać inny adres URL, jeśli chcesz wskazać inne wdrożenie - zapisuje się on
+        wyłącznie w Twojej przeglądarce (localStorage).
       </p>
       <form id="settings-form">
         <fieldset>
@@ -32,10 +35,6 @@
           <p>
             <label for="appsScriptUrl">Adres URL wdrożonej aplikacji internetowej (kończy się na /exec)</label><br />
             <input type="text" id="appsScriptUrl" name="appsScriptUrl" size="80" />
-          </p>
-          <p>
-            <label for="sharedSecret">Sekret (SHARED_SECRET z Apps Script) - wymagany do edycji danych</label><br />
-            <input type="password" id="sharedSecret" name="sharedSecret" size="60" />
           </p>
         </fieldset>
         <p><button type="submit">Zapisz ustawienia</button></p>
@@ -49,6 +48,7 @@
     </section>
   </main>
 
+  <script src="js/config.js"></script>
   <script src="js/common.js"></script>
   <script src="js/settings.js"></script>
 </body>

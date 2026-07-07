@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>WodneCustomy - Szczegóły meczu</title>
+  <title>WodneCustomy - Losowanie składu</title>
 </head>
 <body>
   <header>
@@ -24,14 +24,26 @@
       <p id="status-message">Wczytywanie...</p>
     </section>
 
-    <section id="match-summary">
-      <h2>Podsumowanie meczu</h2>
-      <table border="1" id="match-fields-table">
-        <tbody></tbody>
-      </table>
+    <section id="select-section">
+      <h2>Wybierz 10 graczy</h2>
+      <p>
+        <label for="player-search">Szukaj (nick / Riot ID / Discord)</label>
+        <input type="text" id="player-search" size="30" />
+      </p>
+      <p id="selected-count">Wybrano: 0/10</p>
+      <div id="player-list">Wczytywanie...</div>
+      <p>
+        <button type="button" id="randomize-btn" disabled>Losuj skład</button>
+        <button type="button" id="clear-selection-btn">Wyczyść wybór</button>
+      </p>
     </section>
 
-    <div id="teams-container"></div>
+    <section id="result-section">
+      <h2>Wynik losowania</h2>
+      <div id="randomizer-result">
+        <p>Wybierz dokładnie 10 graczy i kliknij "Losuj skład".</p>
+      </div>
+    </section>
 
     <section id="log-section">
       <h2>Dziennik zdarzeń</h2>
@@ -41,6 +53,6 @@
 
   <script src="js/config.js"></script>
   <script src="js/common.js"></script>
-  <script src="js/match.js"></script>
+  <script src="js/randomizer.js"></script>
 </body>
 </html>

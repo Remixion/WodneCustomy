@@ -1,4 +1,4 @@
-// Agregacje statystyk używane przez stats.js oraz profile.js.
+// Agregacje statystyk używane przez stats.js oraz players.js.
 // Wymaga funkcji pomocniczych z common.js (numberOr, isWinValue, mostFrequent, getPlayerDisplayName, getPlayerColor).
 
 function computeIndividualStats(matchPlayers, playersByPuuid) {
@@ -22,7 +22,7 @@ function computeIndividualStats(matchPlayers, playersByPuuid) {
 
     return {
       puuid,
-      displayName: getPlayerDisplayName(puuid, games[0].summonerName, playersByPuuid),
+      displayName: getPlayerDisplayName(puuid, playersByPuuid),
       color: getPlayerColor(player || { puuid, summonerName: games[0].summonerName }),
       gamesPlayed,
       wins,

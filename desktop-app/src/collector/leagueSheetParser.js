@@ -1,4 +1,5 @@
 const fs = require('fs');
+const { mapIdToShortName, summarizeListForSide } = require('./matchBuilder');
 
 /**
  * Import ręcznie prowadzonego arkusza ligi sprzed tej apki (kolumny: GID,
@@ -95,14 +96,11 @@ function buildMatchFromLeagueSheetRow(row) {
   const match = {
     matchId,
     gid,
-    dataSource: 'league-sheet',
+    dataSource: 'manual',
     gameCreationDate,
-    gameDurationSec: '',
-    gameMode: 'CLASSIC',
-    gameType: 'CUSTOM_GAME',
-    mapId: 11,
-    queueId: 0,
-    gameVersion: pick(row, 'Patch'),
+    gameDurationSec: '-',
+    mapId: mapIdToShortName(11),
+    patch: pick(row, 'Patch'),
     winningTeam,
     blueBans: '',
     redBans: '',
@@ -171,6 +169,9 @@ function buildMatchFromLeagueSheetRow(row) {
       notes: '',
     };
   }).filter(Boolean);
+
+  match.blueChampions = summarizeListForSide(players, 'BLUE', 'championName');
+  match.redChampions = summarizeListForSide(players, 'RED', 'championName');
 
   return { match, players };
 }

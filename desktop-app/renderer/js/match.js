@@ -1,13 +1,13 @@
 const MATCH_FIELDS = [
-  'gid', 'gameCreationDate', 'gameDurationSec', 'gameMode', 'gameType', 'mapId', 'queueId', 'gameVersion',
-  'winningTeam', 'blueBans', 'redBans',
+  'gid', 'gameCreationDate', 'gameDurationSec', 'mapId', 'patch',
+  'winningTeam', 'blueBans', 'redBans', 'blueChampions', 'redChampions', 'bluePlayerNames', 'redPlayerNames',
   'blueBaronKills', 'blueDragonKills', 'blueHeraldKills', 'blueTowerKills', 'blueInhibKills',
   'redBaronKills', 'redDragonKills', 'redHeraldKills', 'redTowerKills', 'redInhibKills',
   'notes',
 ];
 
 const PLAYER_FIELDS = [
-  'summonerName', 'championName', 'championId', 'teamPosition', 'spell1', 'spell2',
+  'championName', 'championId', 'teamPosition', 'spell1', 'spell2',
   'primaryRuneStyle', 'subRuneStyle', 'keystone', 'champLevel',
   'kills', 'deaths', 'assists', 'kda', 'cs', 'csPerMin',
   'goldEarned', 'damageDealtToChampions', 'damageTaken', 'damageSelfMitigated', 'totalHeal',
@@ -26,7 +26,7 @@ async function load() {
     return;
   }
   renderMatchFields(data.match);
-  const allPlayers = await window.api.store.listPlayers();
+  const allPlayers = await window.api.store.refreshPlayersFromSheets();
   const playersByPuuid = buildPlayersByPuuid(allPlayers);
   renderTeams(data.players, playersByPuuid);
 }
@@ -139,8 +139,8 @@ function renderTeamTable(table, players, playersByPuuid) {
     const tr = document.createElement('tr');
     const nickTd = document.createElement('td');
     const playerInfo = (playersByPuuid && playersByPuuid[player.puuid]) || null;
-    const displayNick = getPlayerDisplayName(player.puuid, player.summonerName, playersByPuuid || {});
-    nickTd.innerHTML = colorizeName(displayNick, getPlayerColor(playerInfo || { puuid: player.puuid, summonerName: player.summonerName }));
+    const displayNick = getPlayerDisplayName(player.puuid, playersByPuuid || {});
+    nickTd.innerHTML = colorizeName(displayNick, getPlayerColor(playerInfo || { puuid: player.puuid }));
     tr.appendChild(nickTd);
     const puuidTd = document.createElement('td');
     puuidTd.textContent = player.puuid ? player.puuid.slice(0, 8) + '...' : '';
@@ -151,10 +151,10 @@ function renderTeamTable(table, players, playersByPuuid) {
       const input = document.createElement('input');
       input.type = 'text';
       input.value = player[field] != null ? player[field] : '';
-      input.size = field === 'summonerName' ? 20 : 8;
+      input.size = 8;
       input.addEventListener('change', async () => {
         await window.api.store.updateMatchPlayerField(matchId, player.puuid, field, input.value);
-        logEvent(`Zapisano ${field} dla ${player.summonerName || player.puuid}`);
+        logEvent(`Zapisano ${field} dla ${displayNick}`);
       });
       td.appendChild(input);
       tr.appendChild(td);

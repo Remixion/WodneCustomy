@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld('api', {
     listPlayers: () => ipcRenderer.invoke('store:list-players'),
     updatePlayerField: (puuid, field, value) => ipcRenderer.invoke('store:update-player-field', { puuid, field, value }),
     deletePlayer: (puuid) => ipcRenderer.invoke('store:delete-player', puuid),
+    addPlayer: (player) => ipcRenderer.invoke('store:add-player', player),
+    refreshPlayersFromSheets: () => ipcRenderer.invoke('store:refresh-players-from-sheets'),
   },
   sync: {
     pushMatch: (matchId) => ipcRenderer.invoke('sync:push-match', matchId),

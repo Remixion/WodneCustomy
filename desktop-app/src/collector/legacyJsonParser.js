@@ -1,7 +1,13 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { normalizeTeamPosition, resolveDuplicateJungles, toPatchVersion } = require('./matchBuilder');
+const {
+  normalizeTeamPosition,
+  resolveDuplicateJungles,
+  toPatchVersion,
+  mapIdToShortName,
+  summarizeListForSide,
+} = require('./matchBuilder');
 
 function teamLabel(teamId) {
   return teamId === 100 ? 'BLUE' : teamId === 200 ? 'RED' : String(teamId);
@@ -182,11 +188,12 @@ function buildMatchFromLegacyJson(raw, { gameId, previousEogStatsBlock = null, d
   }
   const winningTeam = blueTeam.win === true || blueTeam.win === 'Win' ? 'BLUE' : redTeam.win === true || redTeam.win === 'Win' ? 'RED' : '';
 
-  let gameDurationSec = toNum(pick(raw, 'gameDuration', 'gameLength'), 0);
+  const rawDuration = pick(raw, 'gameDuration', 'gameLength');
+  let gameDurationSec = rawDuration === undefined ? '-' : toNum(rawDuration, 0);
   // Surowe zrzuty EOG stats block podają czas gry w milisekundach, nie w
   // sekundach (potwierdzone na realnym pliku: TIME_PLAYED graczy w sekundach
   // odpowiada w przybliżeniu gameDuration/1000).
-  if (gameDurationSec > 36000) gameDurationSec = Math.round(gameDurationSec / 1000);
+  if (typeof gameDurationSec === 'number' && gameDurationSec > 36000) gameDurationSec = Math.round(gameDurationSec / 1000);
 
   const gameCreationDate =
     raw.date || (raw.gameCreation ? new Date(raw.gameCreation).toISOString() : null) || new Date().toISOString();
@@ -196,11 +203,8 @@ function buildMatchFromLegacyJson(raw, { gameId, previousEogStatsBlock = null, d
     dataSource,
     gameCreationDate,
     gameDurationSec,
-    gameMode: pick(raw, 'gameMode', 'queueType') || '',
-    gameType: raw.gameType || '',
-    mapId: raw.mapId || '',
-    queueId: raw.queueId || '',
-    gameVersion: toPatchVersion(raw.gameVersion),
+    mapId: mapIdToShortName(raw.mapId),
+    patch: toPatchVersion(raw.gameVersion),
     winningTeam,
     blueBans: bansToNames(blueTeam),
     redBans: bansToNames(redTeam),
@@ -306,6 +310,9 @@ function buildMatchFromLegacyJson(raw, { gameId, previousEogStatsBlock = null, d
   });
 
   resolveDuplicateJungles(players);
+
+  match.blueChampions = summarizeListForSide(players, 'BLUE', 'championName');
+  match.redChampions = summarizeListForSide(players, 'RED', 'championName');
 
   return { match, players };
 }

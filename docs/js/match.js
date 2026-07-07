@@ -1,13 +1,13 @@
 const MATCH_FIELDS = [
-  'gid', 'gameCreationDate', 'gameDurationSec', 'gameMode', 'gameType', 'mapId', 'queueId', 'gameVersion',
-  'winningTeam', 'blueBans', 'redBans',
+  'gid', 'gameCreationDate', 'gameDurationSec', 'mapId', 'patch',
+  'winningTeam', 'blueBans', 'redBans', 'blueChampions', 'redChampions', 'bluePlayerNames', 'redPlayerNames',
   'blueBaronKills', 'blueDragonKills', 'blueHeraldKills', 'blueTowerKills', 'blueInhibKills',
   'redBaronKills', 'redDragonKills', 'redHeraldKills', 'redTowerKills', 'redInhibKills',
   'notes',
 ];
 
 const PLAYER_FIELDS = [
-  'summonerName', 'championName', 'championId', 'teamPosition', 'spell1', 'spell2',
+  'championName', 'championId', 'teamPosition', 'spell1', 'spell2',
   'primaryRuneStyle', 'subRuneStyle', 'keystone', 'champLevel',
   'kills', 'deaths', 'assists', 'kda', 'cs', 'csPerMin',
   'goldEarned', 'damageDealtToChampions', 'damageTaken', 'damageSelfMitigated', 'totalHeal',
@@ -56,19 +56,7 @@ function renderMatchFields(match) {
     const th = document.createElement('th');
     th.textContent = field;
     const td = document.createElement('td');
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.value = match[field] != null ? match[field] : '';
-    input.size = 60;
-    input.addEventListener('change', async () => {
-      try {
-        await postAction('updateMatchField', { matchId: match.matchId, field, value: input.value });
-        logEvent(`Zapisano ${field}`);
-      } catch (err) {
-        logEvent(`Błąd zapisu ${field}: ${err.message}`);
-      }
-    });
-    td.appendChild(input);
+    td.textContent = match[field] != null ? match[field] : '';
     tr.appendChild(th);
     tr.appendChild(td);
     tbody.appendChild(tr);
@@ -153,8 +141,8 @@ function renderTeamTable(table, players, playersByPuuid) {
     const tr = document.createElement('tr');
     const nickTd = document.createElement('td');
     const playerInfo = (playersByPuuid && playersByPuuid[player.puuid]) || null;
-    const displayNick = getPlayerDisplayName(player.puuid, player.summonerName, playersByPuuid || {});
-    nickTd.innerHTML = colorizeName(displayNick, getPlayerColor(playerInfo || { puuid: player.puuid, summonerName: player.summonerName }));
+    const displayNick = getPlayerDisplayName(player.puuid, playersByPuuid || {});
+    nickTd.innerHTML = colorizeName(displayNick, getPlayerColor(playerInfo || { puuid: player.puuid }));
     tr.appendChild(nickTd);
     const puuidTd = document.createElement('td');
     puuidTd.textContent = player.puuid ? String(player.puuid).slice(0, 8) + '...' : '';
@@ -162,19 +150,7 @@ function renderTeamTable(table, players, playersByPuuid) {
 
     PLAYER_FIELDS.forEach((field) => {
       const td = document.createElement('td');
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.value = player[field] != null ? player[field] : '';
-      input.size = field === 'summonerName' ? 20 : 8;
-      input.addEventListener('change', async () => {
-        try {
-          await postAction('updateMatchPlayerField', { matchId, puuid: player.puuid, field, value: input.value });
-          logEvent(`Zapisano ${field} dla ${player.summonerName || player.puuid}`);
-        } catch (err) {
-          logEvent(`Błąd zapisu ${field}: ${err.message}`);
-        }
-      });
-      td.appendChild(input);
+      td.textContent = player[field] != null ? player[field] : '';
       tr.appendChild(td);
     });
 

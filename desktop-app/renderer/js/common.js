@@ -33,7 +33,7 @@ const DATA_SOURCE_LABELS = {
   'lcu-history': 'Historia klienta League',
   'rofl-stats': 'Statystyki z pliku .rofl',
   'legacy-json': 'Stary plik JSON',
-  'league-sheet': 'Arkusz ligi (ręcznie wpisane)',
+  manual: 'Arkusz ligi (ręcznie wpisane)',
   placeholder: 'Brak danych (tylko ID)',
 };
 
@@ -72,7 +72,7 @@ function sortTeamValues(teams) {
   });
 }
 
-// ---- Statystyki pomocnicze (współdzielone przez stats.js / profile.js) ----
+// ---- Statystyki pomocnicze (współdzielone przez stats.js / players.js) ----
 
 function numberOr(value, fallback = 0) {
   const n = Number(value);
@@ -107,12 +107,26 @@ function mostFrequent(values) {
   return { value: best, count: bestCount };
 }
 
-function getPlayerDisplayName(puuid, summonerNameFallback, playersByPuuid) {
+function shortenPuuid(puuid) {
+  return puuid ? String(puuid).slice(0, 8) + '...' : 'nieznany';
+}
+
+/**
+ * Nick jest jedyną nazwą pokazywaną w większości apki - surowe summonerName
+ * (prawdziwe Riot ID) pojawia się celowo tylko w Profilu i Losowaniu, zawsze
+ * obok nicku, nigdy zamiast niego. Gdy nick nie jest jeszcze przypisany, tutaj
+ * pokazujemy skrócone puuid, a NIE summonerName.
+ */
+function getPlayerDisplayName(puuid, playersByPuuid) {
   const p = playersByPuuid[puuid];
   if (p && p.nick) return p.nick;
-  if (p && p.summonerName) return p.summonerName;
-  if (summonerNameFallback) return summonerNameFallback;
-  return puuid ? String(puuid).slice(0, 8) + '...' : 'nieznany';
+  return shortenPuuid(puuid);
+}
+
+/** Jak getPlayerDisplayName, ale gdy obiekt gracza jest już w ręku (bez potrzeby mapy puuid->gracz). */
+function displayNameForPlayer(player) {
+  if (player && player.nick) return player.nick;
+  return shortenPuuid(player && player.puuid);
 }
 
 // ---- Kolor gracza (paleta + przypisanie deterministyczne po puuid) ----
