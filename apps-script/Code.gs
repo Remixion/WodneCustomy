@@ -14,10 +14,22 @@ var SHEET_MATCHES = 'Matches';
 var SHEET_MATCH_PLAYERS = 'MatchPlayers';
 var SHEET_PLAYERS = 'Players';
 
+/**
+ * UWAGA: kolumny per rola (championi/gracze per TOP/JNG/MID/BOT/SUP - dawniej
+ * blueTopChampion/blueTopPlayer/... wypełniane stąd) zostały świadomie USUNIĘTE
+ * z tej listy. Użytkownik przerobił je w Arkuszu (kolumny W:AP) na własne
+ * formuły (INDEKS/PODAJ.POZYCJĘ do MatchPlayers) pod nowymi nazwami
+ * (blueChTOP, blueTOP, ...) - każda operacja zapisu w tym pliku (upsertRow_,
+ * getOrCreateSheet_) działa na zakresie o szerokości MATCHES_HEADERS.length,
+ * więc dopóki te kolumny nie są w tej liście, żaden sync nigdy ich nie
+ * dotknie ani nie nadpisze formuły. Wciąż są jednak czytane (tylko do
+ * odczytu) przez doGet - patrz sheetToObjectsWithExtraColumns_ niżej - żeby
+ * apka/strona mogły pokazać wyliczone wartości.
+ */
 var MATCHES_HEADERS = [
   'gid', 'matchId', 'dataSource', 'gameCreationDate', 'gameDurationSec',
   'mapId', 'patch', 'winningTeam',
-  'blueBans', 'redBans', 'blueChampions', 'redChampions', 'bluePlayerNames', 'redPlayerNames',
+  'blueBans', 'redBans',
   'blueBaronKills', 'blueDragonKills', 'blueHeraldKills', 'blueTowerKills', 'blueInhibKills',
   'redBaronKills', 'redDragonKills', 'redHeraldKills', 'redTowerKills', 'redInhibKills',
   'notes', 'rawDataJson'
@@ -64,8 +76,16 @@ var PLAYERS_HEADERS = [
   'soloTier', 'soloRank', 'soloLP', 'soloWins', 'soloLosses'
 ];
 
-/** Kolumny, których automatyczna synchronizacja NIGDY nie nadpisuje (ręcznie edytowane). */
-var PROTECTED_ON_SYNC = ['notes', 'nick', 'color', 'avatarSource', 'discordNick'];
+/**
+ * Kolumny, których automatyczna synchronizacja NIGDY nie nadpisuje (ręcznie
+ * edytowane) - dotyczy tylko AKTUALIZACJI istniejącego wiersza (upsertRow_
+ * wciąż zapisuje te pola normalnie przy pierwszym wstawieniu nowego wiersza).
+ * teamPosition: wykrywanie roli z importu bywa błędne (patrz duplikaty
+ * TOP/brak SUPP) - jeśli ktoś poprawi rolę ręcznie w MatchPlayers, kolejny
+ * re-sync tego samego meczu (np. ponowny import/resync) nie ma jej znów
+ * nadpisywać wykrytą (błędną) wartością z apki.
+ */
+var PROTECTED_ON_SYNC = ['notes', 'nick', 'color', 'avatarSource', 'discordNick', 'teamPosition'];
 
 function getSpreadsheet_() {
   return SpreadsheetApp.getActiveSpreadsheet();
@@ -95,6 +115,38 @@ function sheetToObjects_(sheet, headers) {
     .map(function (row) {
       var obj = {};
       headers.forEach(function (h, i) { obj[h] = row[i]; });
+      return obj;
+    });
+}
+
+/**
+ * Jak sheetToObjects_, ale DODATKOWO odczytuje (tylko do odczytu) wszystkie
+ * kolumny za MATCHES_HEADERS, jeśli w Arkuszu fizycznie istnieją - używając
+ * nazw z AKTUALNEGO wiersza nagłówków jako kluczy. Dzięki temu użytkownik
+ * może dopisać własne kolumny/formuły (patrz komentarz przy MATCHES_HEADERS)
+ * bez zmiany tego pliku - pojawią się automatycznie pod swoją nazwą w danych
+ * zwracanych przez doGet, ale żadna operacja zapisu nigdy ich nie dotknie
+ * (te operacje zawsze ograniczają się do headers.length kolumn).
+ */
+function sheetToObjectsWithExtraColumns_(sheet, headers) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+  var lastCol = sheet.getLastColumn();
+  var extraHeaders = lastCol > headers.length
+    ? sheet.getRange(1, headers.length + 1, 1, lastCol - headers.length).getValues()[0]
+    : [];
+  var totalCols = headers.length + extraHeaders.length;
+  var values = sheet.getRange(2, 1, lastRow - 1, totalCols).getValues();
+  return values
+    .filter(function (row) { return row.some(function (c) { return c !== '' && c !== null; }); })
+    .map(function (row) {
+      var obj = {};
+      headers.forEach(function (h, i) { obj[h] = row[i]; });
+      // Kolumna dodatkowa o nazwie duplikującej jedną z MATCHES_HEADERS (np. stary/zepsuty
+      // artefakt z wcześniejszego układu arkusza) NIE MOŻE nadpisać już poprawnie odczytanej
+      // wartości z jej właściwej, stałej pozycji - inaczej zduplikowana nazwa w wierszu 1 cicho
+      // psuje dane (dokładnie to działo się z kolumnami W:Z, nazwanymi tak samo jak S:V).
+      extraHeaders.forEach(function (h, i) { if (h && headers.indexOf(h) === -1) obj[h] = row[headers.length + i]; });
       return obj;
     });
 }
@@ -180,41 +232,6 @@ function cascadeFieldToMatchPlayers_(sheet, matchId, field, value) {
   }
 }
 
-function isBlueLikeSide_(team) {
-  return team === 'BLUE' || team === 'LEFT';
-}
-function isRedLikeSide_(team) {
-  return team === 'RED' || team === 'RIGHT';
-}
-
-/**
- * Buduje listę nicków (do kolumn Matches.bluePlayerNames/redPlayerNames) na
- * podstawie AKTUALNEJ zawartości podarkusza Players - nie tego, co akurat
- * wysłała apka - żeby ręczna zmiana nicku bezpośrednio w Arkuszu Players była
- * od razu źródłem prawdy przy każdej kolejnej synchronizacji meczu, bez
- * względu na to, czy lokalny cache apki desktopowej zdążył się już odświeżyć.
- * Gdy dany gracz nie ma jeszcze przypisanego nicku w Players, zostaje surowe
- * summonerName z tego meczu (np. "Cytrysia#UwU"). Mecze z arkusza ligi (bez
- * znanej realnej strony Blue/Red) mają team="LEFT"/"RIGHT" - sideFilterFn
- * traktuje LEFT jak BLUE i RIGHT jak RED wyłącznie na potrzeby tego
- * wygodnego podziału kolumn, bez zmiany samego pola team/winningTeam.
- */
-function resolvePlayerNamesFromPlayersSheet_(playersSheet, matchPlayers, sideFilterFn) {
-  var players = sheetToObjects_(playersSheet, PLAYERS_HEADERS);
-  var byPuuid = {};
-  players.forEach(function (p) {
-    if (p.puuid) byPuuid[p.puuid] = p;
-  });
-  return (matchPlayers || [])
-    .filter(function (mp) { return sideFilterFn(mp.team); })
-    .map(function (mp) {
-      var known = mp.puuid && byPuuid[mp.puuid];
-      return (known && known.nick) || mp.summonerName || '';
-    })
-    .filter(function (v) { return v; })
-    .join(', ');
-}
-
 function checkToken_(token) {
   var expected = PropertiesService.getScriptProperties().getProperty('SHARED_SECRET');
   if (!expected) return true; // brak ustawionego sekretu = brak ochrony (niezalecane)
@@ -232,7 +249,7 @@ function doGet(e) {
     var playersSheet = getOrCreateSheet_(SHEET_PLAYERS, PLAYERS_HEADERS);
 
     var data = {
-      matches: sheetToObjects_(matchesSheet, MATCHES_HEADERS),
+      matches: sheetToObjectsWithExtraColumns_(matchesSheet, MATCHES_HEADERS),
       matchPlayers: sheetToObjects_(matchPlayersSheet, MATCH_PLAYERS_HEADERS),
       players: sheetToObjects_(playersSheet, PLAYERS_HEADERS),
       generatedAt: new Date().toISOString()
@@ -264,10 +281,6 @@ function doPost(e) {
     switch (action) {
       case 'syncMatch': {
         // payload: { match: {...}, players: [ {...matchPlayer}, ... ] }
-        if (payload.match) {
-          payload.match.bluePlayerNames = resolvePlayerNamesFromPlayersSheet_(playersSheet, payload.players, isBlueLikeSide_);
-          payload.match.redPlayerNames = resolvePlayerNamesFromPlayersSheet_(playersSheet, payload.players, isRedLikeSide_);
-        }
         upsertRow_(matchesSheet, MATCHES_HEADERS, ['matchId'], payload.match, PROTECTED_ON_SYNC);
         var byPuuidForNick_ = {};
         sheetToObjects_(playersSheet, PLAYERS_HEADERS).forEach(function (p) {
@@ -334,4 +347,39 @@ function setupSheets() {
   getOrCreateSheet_(SHEET_MATCHES, MATCHES_HEADERS);
   getOrCreateSheet_(SHEET_MATCH_PLAYERS, MATCH_PLAYERS_HEADERS);
   getOrCreateSheet_(SHEET_PLAYERS, PLAYERS_HEADERS);
+}
+
+/**
+ * DIAGNOSTYKA (tylko do odczytu, nic nie zapisuje) - uruchom ręcznie z edytora Apps Script
+ * (wybierz tę funkcję z rozwijanej listy obok "Uruchom", potem Wyświetl -> Dziennik wykonania /
+ * Ctrl+Enter) i wklej wynik. Zestawia MATCHES_HEADERS (to, czego oczekuje ten kod na stałych
+ * pozycjach A, B, C...) z tym, co FIZYCZNIE jest w wierszu 1 arkusza Matches oraz przykładowym
+ * wierszem danych - po to, żeby namierzyć dokładnie od której kolumny się rozjeżdżają, zamiast
+ * zgadywać i ryzykować zepsucie danych zmianą MATCHES_HEADERS na ślepo.
+ */
+function diagnoseMatchesHeaders() {
+  var sheet = getSpreadsheet_().getSheetByName(SHEET_MATCHES);
+  if (!sheet) { Logger.log('Brak arkusza "Matches".'); return; }
+  var lastCol = sheet.getLastColumn();
+  var lastRow = sheet.getLastRow();
+  var colLetter = function (i) { // i = 0-indexed
+    var s = '';
+    i += 1;
+    while (i > 0) { var m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); }
+    return s;
+  };
+  var actualHeaders = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  var sampleRow = lastRow >= 2 ? sheet.getRange(2, 1, 1, lastCol).getValues()[0] : [];
+  var sampleRowLast = lastRow >= 2 ? sheet.getRange(lastRow, 1, 1, lastCol).getValues()[0] : [];
+
+  Logger.log('lastRow=%s lastCol=%s (MATCHES_HEADERS.length=%s)', lastRow, lastCol, MATCHES_HEADERS.length);
+  Logger.log('--- Kolumna | oczekiwane (MATCHES_HEADERS) | faktyczny nagłówek (wiersz 1) | przykład wiersz 2 | przykład ostatni wiersz ---');
+  for (var i = 0; i < lastCol; i++) {
+    var expected = i < MATCHES_HEADERS.length ? MATCHES_HEADERS[i] : '(poza MATCHES_HEADERS - kolumna dodatkowa)';
+    var mismatch = i < MATCHES_HEADERS.length && String(actualHeaders[i]) !== MATCHES_HEADERS[i] ? '  <== NIEZGODNE' : '';
+    Logger.log(
+      colLetter(i) + ' | ' + expected + ' | ' + actualHeaders[i] + ' | ' +
+      JSON.stringify(sampleRow[i]) + ' | ' + JSON.stringify(sampleRowLast[i]) + mismatch
+    );
+  }
 }
