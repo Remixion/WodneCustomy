@@ -12,6 +12,18 @@ function groupMatchPlayers(matches, matchPlayers) {
   return (matches || []).map((match) => ({ match, players: byId[match.matchId] || [] }));
 }
 
+/**
+ * Czeka aż przeglądarka wczyta czcionki (Space Grotesk/JetBrains Mono) zanim pokażemy właściwy
+ * layout - na GitHub Pages, gdzie fonty ładują się z sieci (a nie z lokalnego cache Electrona jak
+ * na desktopie), pierwsze wejście na stronę potrafiło "rozjechać" sztywne siatki (np. Losowanie)
+ * fallbackowym fontem, który po doładowaniu Google Fonts nagle zmieniał metryki i przesuwał layout.
+ * Limit czasu, żeby nigdy nie zawiesić ładowania, gdyby fonty się nie doczekały.
+ */
+function waitForFonts() {
+  if (!document.fonts || !document.fonts.ready) return Promise.resolve();
+  return Promise.race([document.fonts.ready, new Promise((resolve) => setTimeout(resolve, 1500))]);
+}
+
 class BrowserApp extends React.Component {
   state = {
     ready: false, err: null, matches: [], agg: null, statics: null,
@@ -46,8 +58,10 @@ class BrowserApp extends React.Component {
       const playersByPuuid = buildPlayersByPuuid(data.players);
       const matches = L.buildMatchesFromStore(stored, playersByPuuid, statics, null);
       const agg = L.aggregate(matches);
+      await waitForFonts();
       this.setState({ ready: true, statics, matches, agg, playersByPuuid, generatedAt: data.generatedAt }, () => this.readHash());
     } catch (e) {
+      await waitForFonts();
       this.setState({ ready: true, err: String(e && e.message || e), statics, matches: [], agg: L.aggregate([]) });
     }
   }
@@ -130,9 +144,7 @@ class BrowserApp extends React.Component {
       h("button", { onClick: () => this.reload(), title: "Odśwież dane z Arkusza", style: { cursor: "pointer", width: 34, height: 34, flex: "0 0 auto", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 9, border: "1px solid " + t.line2, background: "transparent", color: t.mut, fontSize: 15 } }, "↻"),
       h("div", { style: { display: "flex", alignItems: "center", gap: 6, flex: "0 0 auto" } },
         h("button", { onClick: () => toggleMute(this), title: this.state.muted ? "Włącz muzykę" : "Wycisz muzykę", style: { cursor: "pointer", width: 34, height: 34, flex: "0 0 auto", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 9, border: "1px solid " + (this.state.muted ? t.line2 : "rgba(90,200,255,.5)"), background: this.state.muted ? "transparent" : "rgba(90,200,255,.14)", color: this.state.muted ? t.mut : "#dff3ff", fontSize: 15, boxShadow: this.state.muted ? "none" : "0 0 12px rgba(90,200,255,.35)" } }, this.state.muted ? "🔇" : "🔊"),
-        h("input", { type: "range", min: 0, max: 1, step: 0.01, value: this.state.muted ? 0 : this.state.volume, onChange: (e) => setVolume(this, parseFloat(e.target.value)), title: "Głośność", style: { width: 70, accentColor: "#5ac8ff", cursor: "pointer" } })),
-      h("a", { href: "players.html", title: "Profile graczy (szczegóły + ranga)", style: { cursor: "pointer", padding: "8px 12px", borderRadius: 9, border: "1px solid " + t.line2, background: "transparent", color: t.mut, fontWeight: 600, fontSize: 12, fontFamily: t.disp } }, "Gracze"),
-      h("a", { href: "settings.html", title: "Ustawienia", style: { cursor: "pointer", padding: "8px 12px", borderRadius: 9, border: "1px solid " + t.line2, background: "transparent", color: t.mut, fontWeight: 600, fontSize: 12, fontFamily: t.disp } }, "Ustawienia")
+        h("input", { type: "range", min: 0, max: 1, step: 0.01, value: this.state.muted ? 0 : this.state.volume, onChange: (e) => setVolume(this, parseFloat(e.target.value)), title: "Głośność", style: { width: 70, accentColor: "#5ac8ff", cursor: "pointer" } }))
     );
   }
 

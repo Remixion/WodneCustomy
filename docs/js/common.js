@@ -95,7 +95,7 @@ function sortTeamValues(teams) {
   });
 }
 
-// ---- Statystyki pomocnicze (współdzielone przez stats.js / players.js) ----
+// ---- Statystyki pomocnicze (współdzielone przez browserData.js / js/browser/*.js) ----
 
 function numberOr(value, fallback = 0) {
   const n = Number(value);
