@@ -32,7 +32,7 @@
     901: ["Smolder", "Smolder"]
   };
 
-  const norm = (s) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const norm = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 
   function P(o) {
     return Object.assign({
@@ -128,7 +128,7 @@
   function isRedLike(team) { return team === "RED" || team === "RIGHT"; }
 
   function parseBanNamesToIds(bansField, nameToId) {
-    return (bansField || "")
+    return String(bansField || "")
       .split(",")
       .map((s) => s.trim())
       .map((name) => (!name || /^none$/i.test(name) ? -1 : (nameToId[norm(name)] || -1)));
@@ -145,8 +145,8 @@
    */
   function buildPlayer(mp, playersByPuuid, statics, extraStats) {
     const known = mp.puuid && playersByPuuid[mp.puuid];
-    const nick = (known && known.nick) || (mp.summonerName || "").split("#")[0] || mp.puuid || "?";
-    const [summoner, tag] = (mp.summonerName || "").split("#");
+    const nick = (known && known.nick) || String(mp.summonerName || "").split("#")[0] || mp.puuid || "?";
+    const [summoner, tag] = String(mp.summonerName || "").split("#");
     const champId = Number(mp.championId) || statics.champByName[norm(mp.championName)] || 0;
     const cinfo = statics.champById[champId] || CHAMP_STATIC[champId] || [mp.championName || String(champId), mp.championName || String(champId)];
     const extra = (extraStats && mp.puuid && extraStats[mp.puuid]) || {};
@@ -186,7 +186,7 @@
       const blue = (players || []).filter((p) => isBlueLike(p.team)).map((p) => buildPlayer(p, playersByPuuid, statics, extraStats));
       const red = (players || []).filter((p) => isRedLike(p.team)).map((p) => buildPlayer(p, playersByPuuid, statics, extraStats));
       const byRole = (arr) => arr.slice().sort((a, b) => (ROLE_ORDER[a.role] ?? 9) - (ROLE_ORDER[b.role] ?? 9));
-      const winner = match.winningTeam === "RIGHT" ? "RED" : match.winningTeam === "LEFT" ? "BLUE" : (match.winningTeam || "").toUpperCase();
+      const winner = match.winningTeam === "RIGHT" ? "RED" : match.winningTeam === "LEFT" ? "BLUE" : String(match.winningTeam || "").toUpperCase();
       const objOf = (prefix) => ({
         baron: Number(match[prefix + "BaronKills"]) || 0,
         dragon: Number(match[prefix + "DragonKills"]) || 0,
