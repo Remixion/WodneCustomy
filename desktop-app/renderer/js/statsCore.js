@@ -1,7 +1,7 @@
 // Agregacje statystyk używane przez stats.js oraz players.js.
 // Wymaga funkcji pomocniczych z common.js (numberOr, isWinValue, mostFrequent, getPlayerDisplayName, getPlayerColor).
 
-function computeIndividualStats(matchPlayers, playersByPuuid) {
+function computeIndividualStats(matchPlayers, playersByPuuid, totalMatches) {
   const byPuuid = {};
   (matchPlayers || []).forEach((mp) => {
     if (!mp.puuid) return;
@@ -28,6 +28,8 @@ function computeIndividualStats(matchPlayers, playersByPuuid) {
       wins,
       losses,
       winRatePct: gamesPlayed ? (wins / gamesPlayed) * 100 : 0,
+      // Odpowiednik "wskaźnika wyboru" championów, przeniesiony na gracza: w ilu % wszystkich zarejestrowanych meczów brał udział.
+      participationRatePct: totalMatches ? (gamesPlayed / totalMatches) * 100 : null,
       totalKills,
       totalDeaths,
       totalAssists,
@@ -48,6 +50,55 @@ function computeIndividualStats(matchPlayers, playersByPuuid) {
       totalFirstBloods: games.filter((g) => isWinValue(g.firstBloodKill)).length,
       favoriteChampion: mostFrequent(games.map((g) => g.championName)).value,
       favoriteRole: mostFrequent(games.map((g) => g.teamPosition)).value,
+    };
+  });
+}
+
+/** Statystyki per champion (jak tabela "Bohaterowie" na op.gg) - rozegrane gry, KDA, wskaźnik zwycięstw/wyboru/banów, CS, złoto. */
+function computeChampionStats(matchPlayers, matches) {
+  const totalPicks = (matchPlayers || []).length;
+  const totalMatches = (matches || []).length;
+
+  const byChampion = {};
+  (matchPlayers || []).forEach((mp) => {
+    if (!mp.championName) return;
+    if (!byChampion[mp.championName]) byChampion[mp.championName] = [];
+    byChampion[mp.championName].push(mp);
+  });
+
+  const banCounts = {};
+  (matches || []).forEach((m) => {
+    const bannedInThisMatch = new Set();
+    String(m.blueBans || '').split(',').forEach((b) => { const t = b.trim(); if (t && t.toLowerCase() !== 'none') bannedInThisMatch.add(t); });
+    String(m.redBans || '').split(',').forEach((b) => { const t = b.trim(); if (t && t.toLowerCase() !== 'none') bannedInThisMatch.add(t); });
+    bannedInThisMatch.forEach((name) => { banCounts[name] = (banCounts[name] || 0) + 1; });
+  });
+
+  return Object.keys(byChampion).map((championName) => {
+    const games = byChampion[championName];
+    const gamesPlayed = games.length;
+    const wins = games.filter((g) => isWinValue(g.win)).length;
+    const sum = (field) => games.reduce((acc, g) => acc + numberOr(g[field]), 0);
+    const totalKills = sum('kills');
+    const totalDeaths = sum('deaths');
+    const totalAssists = sum('assists');
+    const banCount = banCounts[championName] || 0;
+
+    return {
+      championName,
+      gamesPlayed,
+      wins,
+      losses: gamesPlayed - wins,
+      winRatePct: gamesPlayed ? (wins / gamesPlayed) * 100 : 0,
+      pickRatePct: totalPicks ? (gamesPlayed / totalPicks) * 100 : 0,
+      banCount,
+      banRatePct: totalMatches ? (banCount / totalMatches) * 100 : 0,
+      avgKda: totalDeaths === 0 ? null : (totalKills + totalAssists) / totalDeaths,
+      avgKills: totalKills / gamesPlayed,
+      avgDeaths: totalDeaths / gamesPlayed,
+      avgAssists: totalAssists / gamesPlayed,
+      avgCs: sum('cs') / gamesPlayed,
+      avgGoldEarned: sum('goldEarned') / gamesPlayed,
     };
   });
 }

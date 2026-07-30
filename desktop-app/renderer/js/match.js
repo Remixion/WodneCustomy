@@ -1,9 +1,15 @@
 const MATCH_FIELDS = [
   'gid', 'gameCreationDate', 'gameDurationSec', 'mapId', 'patch',
-  'winningTeam', 'blueBans', 'redBans', 'blueChampions', 'redChampions', 'bluePlayerNames', 'redPlayerNames',
+  'winningTeam', 'blueBans', 'redBans',
   'blueBaronKills', 'blueDragonKills', 'blueHeraldKills', 'blueTowerKills', 'blueInhibKills',
   'redBaronKills', 'redDragonKills', 'redHeraldKills', 'redTowerKills', 'redInhibKills',
   'notes',
+  'blueTopChampion', 'blueTopPlayer', 'blueJungleChampion', 'blueJunglePlayer',
+  'blueMiddleChampion', 'blueMiddlePlayer', 'blueBottomChampion', 'blueBottomPlayer',
+  'blueSupportChampion', 'blueSupportPlayer',
+  'redTopChampion', 'redTopPlayer', 'redJungleChampion', 'redJunglePlayer',
+  'redMiddleChampion', 'redMiddlePlayer', 'redBottomChampion', 'redBottomPlayer',
+  'redSupportChampion', 'redSupportPlayer',
 ];
 
 const PLAYER_FIELDS = [
@@ -18,6 +24,7 @@ const PLAYER_FIELDS = [
 ];
 
 const matchId = qs('matchId');
+document.getElementById('scoreboard-link').href = `scoreboard.html?matchId=${encodeURIComponent(matchId)}`;
 
 async function load() {
   const data = await window.api.store.getMatch(matchId);

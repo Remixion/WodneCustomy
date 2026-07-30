@@ -65,7 +65,7 @@ async function renderProfileDetail(puuid, data, individualStats) {
       <td>${mp.kda || ''}</td>
       <td>${mp.cs != null ? mp.cs : ''}</td>
       <td>${mp.damageDealtToChampions != null ? mp.damageDealtToChampions : ''}</td>
-      <td><a href="match.html?matchId=${encodeURIComponent(match.matchId)}">Szczegóły</a></td>
+      <td><a href="index.html#match/${encodeURIComponent(match.matchId)}">Szczegóły</a></td>
     `;
     tbody.appendChild(tr);
   });

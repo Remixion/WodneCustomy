@@ -1,87 +1,83 @@
-async function loadMatches() {
-  const tbody = document.getElementById('matches-tbody');
-  const matches = await window.api.store.listMatches();
-  tbody.innerHTML = '';
-  if (!matches.length) {
-    tbody.innerHTML = '<tr><td colspan="12">Brak zarejestrowanych meczów. Rozegraj custom 5v5, a dane pojawią się tu automatycznie po jego zakończeniu.</td></tr>';
+/* Kafelki listy meczów (dawne buildMatchCard/buildMatchCardTeamBlock/buildMatchCardPlayerColumn) przeniosły się
+   do MatchesView.js w nowej Przeglądarce meczy (index.html) - tam też mieszka teraz przeglądanie i akcje
+   per-mecz (menu "⋯": notatki/edytuj/scoreboard/wyślij/usuń). Ta strona trzyma listę meczów tylko w pamięci
+   (cachedLocalMatches), żeby zasilić wybór meczu legacy do scalenia w sekcji importu historii klienta poniżej. */
+
+let cachedLocalMatches = [];
+
+/** Prawdziwe Game ID z Riota są zawsze samymi cyframi - mecze legacy (arkusz ligi/stary JSON bez znanego ID) mają matchId typu "legacy-...". */
+function isRealGameId(matchId) {
+  return /^\d+$/.test(String(matchId));
+}
+
+/** Mecze-kandydaci do "Połącz" w tabeli znalezionych Game ID - najnowsze pierwsze. */
+function getLegacyMatchOptions() {
+  return cachedLocalMatches
+    .map(({ match }) => match)
+    .filter((match) => !isRealGameId(match.matchId))
+    .sort((a, b) => new Date(b.gameCreationDate) - new Date(a.gameCreationDate));
+}
+
+/** Wypełnia <select> listą meczów legacy do połączenia - używane zarówno w tabeli historii, jak i przy pojedynczym Game ID. Zwraca liczbę opcji (bez pustej). */
+function populateLegacySelect(select) {
+  const legacyOptions = getLegacyMatchOptions();
+  select.innerHTML = '';
+  const emptyOpt = document.createElement('option');
+  emptyOpt.value = '';
+  emptyOpt.textContent = '(połącz z meczem legacy...)';
+  select.appendChild(emptyOpt);
+  legacyOptions.forEach((legacyMatch) => {
+    const opt = document.createElement('option');
+    opt.value = legacyMatch.matchId;
+    opt.textContent = `#${legacyMatch.gid || '?'} - ${formatDate(legacyMatch.gameCreationDate)} - ${legacyMatch.matchId}`;
+    select.appendChild(opt);
+  });
+  return legacyOptions.length;
+}
+
+/** Importuje mecz pod prawdziwym Game ID i usuwa wybrany stary wpis legacy - wspólna logika dla tabeli historii i pojedynczego wyszukania po Game ID. */
+async function runLegacyMerge(gameId, legacyMatchId) {
+  if (!legacyMatchId) {
+    logEvent('Wybierz najpierw mecz legacy do połączenia.');
     return;
   }
-  matches.forEach(({ match }) => {
-    const tr = document.createElement('tr');
+  if (
+    !confirm(
+      `Zaimportować mecz ${gameId} pod prawdziwym Game ID i usunąć stary wpis ${legacyMatchId}? ` +
+        'Dane ze starego wpisu (oprócz notatek) zostaną zastąpione świeżym importem z pełnymi statystykami.'
+    )
+  ) {
+    return;
+  }
+  try {
+    const mergeResult = await window.api.history.mergeWithLegacy(gameId, legacyMatchId);
+    logEvent(
+      mergeResult.ok
+        ? `Połączono mecz ${gameId} z meczem legacy ${legacyMatchId} (stary wpis usunięty)`
+        : `Błąd łączenia meczu ${gameId} z legacy ${legacyMatchId}: ${mergeResult.error}`
+    );
+    if (mergeResult.ok && mergeResult.roleWarnings && mergeResult.roleWarnings.length) {
+      logEvent(
+        `UWAGA - niezgodność roli przy łączeniu ${gameId} (przyjęto wersję z legacy, sprawdź ręcznie w "Edytuj"): ` +
+          mergeResult.roleWarnings.join('; ')
+      );
+    }
+  } catch (err) {
+    logEvent(`Błąd łączenia meczu ${gameId} z legacy ${legacyMatchId}: ${err.message}`);
+  } finally {
+    loadMatches();
+    reloadHistoryList();
+  }
+}
 
-    const notesCell = document.createElement('td');
-    const notesInput = document.createElement('input');
-    notesInput.type = 'text';
-    notesInput.value = match.notes || '';
-    notesInput.addEventListener('change', async () => {
-      await window.api.store.updateMatchField(match.matchId, 'notes', notesInput.value);
-      logEvent(`Zapisano notatkę meczu ${match.matchId}`);
-    });
-    notesCell.appendChild(notesInput);
-
-    const actionsCell = document.createElement('td');
-
-    const detailLink = document.createElement('a');
-    detailLink.href = `match.html?matchId=${encodeURIComponent(match.matchId)}`;
-    detailLink.textContent = 'Szczegóły';
-    actionsCell.appendChild(detailLink);
-    actionsCell.appendChild(document.createTextNode(' | '));
-
-    const pushBtn = document.createElement('button');
-    pushBtn.type = 'button';
-    pushBtn.textContent = 'Wyślij do Sheets';
-    pushBtn.addEventListener('click', async () => {
-      pushBtn.disabled = true;
-      const result = await window.api.sync.pushMatch(match.matchId);
-      logEvent(`Wysłano mecz ${match.matchId}: ${result.ok ? 'OK' : 'błąd - ' + result.error}`);
-      pushBtn.disabled = false;
-    });
-    actionsCell.appendChild(pushBtn);
-    actionsCell.appendChild(document.createTextNode(' | '));
-
-    const deleteBtn = document.createElement('button');
-    deleteBtn.type = 'button';
-    deleteBtn.textContent = 'Usuń lokalnie';
-    deleteBtn.addEventListener('click', async () => {
-      if (!confirm(`Usunąć mecz ${match.matchId} z lokalnego magazynu? (nie usuwa danych z arkusza)`)) return;
-      await window.api.store.deleteMatch(match.matchId);
-      logEvent(`Usunięto mecz ${match.matchId} lokalnie`);
-      loadMatches();
-    });
-    actionsCell.appendChild(deleteBtn);
-    actionsCell.appendChild(document.createTextNode(' | '));
-
-    const deleteSheetsBtn = document.createElement('button');
-    deleteSheetsBtn.type = 'button';
-    deleteSheetsBtn.textContent = 'Usuń z Sheets';
-    deleteSheetsBtn.addEventListener('click', async () => {
-      if (!confirm(`Usunąć mecz ${match.matchId} z Arkusza Google? (dane lokalne zostaną)`)) return;
-      deleteSheetsBtn.disabled = true;
-      const result = await window.api.sync.deleteMatch(match.matchId);
-      logEvent(`Usunięto mecz ${match.matchId} z Sheets: ${result.ok ? 'OK' : 'błąd - ' + result.error}`);
-      deleteSheetsBtn.disabled = false;
-    });
-    actionsCell.appendChild(deleteSheetsBtn);
-
-    tr.innerHTML = `
-      <td>${match.matchId}</td>
-      <td>${match.gid || ''}</td>
-      <td>${formatDataSource(match.dataSource)}</td>
-      <td>${formatDate(match.gameCreationDate)}</td>
-      <td>${match.mapId || ''}</td>
-      <td>${formatDuration(match.gameDurationSec)}</td>
-      <td>${match.winningTeam || ''}</td>
-      <td>${match.blueBans || ''}</td>
-      <td>${match.redBans || ''}</td>
-      <td>${match.blueChampions || ''}</td>
-      <td>${match.redChampions || ''}</td>
-      <td>${match.bluePlayerNames || ''}</td>
-      <td>${match.redPlayerNames || ''}</td>
-    `;
-    tr.appendChild(notesCell);
-    tr.appendChild(actionsCell);
-    tbody.appendChild(tr);
-  });
+async function loadMatches() {
+  const stored = await window.api.store.listMatches();
+  cachedLocalMatches = stored;
+  populateLegacySelect(document.getElementById('history-lookup-legacy-select'));
+  const statusEl = document.getElementById('matches-count-status');
+  statusEl.textContent = stored.length
+    ? `Zarejestrowanych meczów: ${stored.length}. Przeglądanie i akcje per mecz są teraz w głównej Przeglądarce meczy.`
+    : 'Brak zarejestrowanych meczów. Rozegraj custom 5v5, a dane pojawią się tu automatycznie po jego zakończeniu.';
 }
 
 async function refreshLcuStatus() {
@@ -135,6 +131,7 @@ function renderHistoryRows() {
   const tbody = document.getElementById('history-tbody');
   const onlyCustom = document.getElementById('history-only-custom').checked;
   const matches = onlyCustom ? lastHistoryMatches.filter((m) => m.isCustom) : lastHistoryMatches;
+  const legacyOptions = getLegacyMatchOptions();
 
   tbody.innerHTML = '';
   if (!matches.length) {
@@ -171,6 +168,33 @@ function renderHistoryRows() {
       }
     });
     actionsTd.appendChild(importBtn);
+
+    if (legacyOptions.length) {
+      actionsTd.appendChild(document.createTextNode(' | '));
+
+      const select = document.createElement('select');
+      populateLegacySelect(select);
+      actionsTd.appendChild(select);
+
+      const mergeBtn = document.createElement('button');
+      mergeBtn.type = 'button';
+      mergeBtn.textContent = 'Połącz';
+      mergeBtn.title =
+        'Zaimportuje ten mecz pod prawdziwym Game ID (znalezionym przez skaner/historię klienta) i usunie wybrany stary wpis legacy - to ten sam mecz pod dwoma różnymi ID.';
+      mergeBtn.addEventListener('click', async () => {
+        mergeBtn.disabled = true;
+        importBtn.disabled = true;
+        mergeBtn.textContent = 'Łączenie...';
+        try {
+          await runLegacyMerge(m.gameId, select.value);
+        } finally {
+          mergeBtn.disabled = false;
+          importBtn.disabled = false;
+          mergeBtn.textContent = 'Połącz';
+        }
+      });
+      actionsTd.appendChild(mergeBtn);
+    }
 
     tr.innerHTML = `
       <td>${m.gameId}</td>
@@ -228,6 +252,49 @@ document.getElementById('history-lookup-btn').addEventListener('click', async ()
   }
 });
 
+document.getElementById('history-lookup-import-btn').addEventListener('click', async () => {
+  const gameId = document.getElementById('history-lookup-gameid').value.trim();
+  const resultEl = document.getElementById('history-lookup-result');
+  if (!gameId) {
+    resultEl.textContent = 'Wpisz najpierw Game ID.';
+    return;
+  }
+  const importBtn = document.getElementById('history-lookup-import-btn');
+  importBtn.disabled = true;
+  resultEl.textContent = 'Importowanie...';
+  try {
+    const importResult = await window.api.history.importMatch(gameId);
+    resultEl.textContent = importResult.ok ? `Zaimportowano mecz ${gameId}.` : `Błąd importu: ${importResult.error}`;
+    logEvent(`Import meczu ${gameId} (po Game ID): ${importResult.ok ? 'OK' : 'błąd - ' + importResult.error}`);
+  } catch (err) {
+    resultEl.textContent = `Błąd importu: ${err.message}`;
+    logEvent(`Import meczu ${gameId} (po Game ID): błąd - ${err.message}`);
+  } finally {
+    importBtn.disabled = false;
+    loadMatches();
+    reloadHistoryList();
+  }
+});
+
+document.getElementById('history-lookup-merge-btn').addEventListener('click', async () => {
+  const gameId = document.getElementById('history-lookup-gameid').value.trim();
+  const resultEl = document.getElementById('history-lookup-result');
+  if (!gameId) {
+    resultEl.textContent = 'Wpisz najpierw Game ID.';
+    return;
+  }
+  const mergeBtn = document.getElementById('history-lookup-merge-btn');
+  const legacyMatchId = document.getElementById('history-lookup-legacy-select').value;
+  mergeBtn.disabled = true;
+  resultEl.textContent = 'Łączenie...';
+  try {
+    await runLegacyMerge(gameId, legacyMatchId);
+    resultEl.textContent = '';
+  } finally {
+    mergeBtn.disabled = false;
+  }
+});
+
 // ---- Skaner zakresu Game ID (patrz komentarz w gameIdScanner.js o ograniczeniach) ----
 
 function setScannerRunningUi(running) {
@@ -267,6 +334,17 @@ let scannerLastStats = { checked: 0, errors: 0, foundCount: 0, startId: 0, endId
 window.api.scanner.onProgress((p) => {
   scannerLastStats = { ...scannerLastStats, ...p, foundCount: scannerLastStats.foundCount + (p.newlyFound ? p.newlyFound.length : 0) };
   document.getElementById('scanner-status').textContent = formatScannerStatus({ ...scannerLastStats, running: true });
+  if (p.newlyFound && p.newlyFound.length) {
+    const total = p.endId - p.startId + 1;
+    const done = p.lastId - p.startId + 1;
+    const pct = total > 0 ? ((done / total) * 100).toFixed(4) : '0';
+    p.newlyFound.forEach((g) => {
+      logEvent(`Znaleziono mecz ${g.gameId} (${formatDate(g.gameCreationDate)}) na ${pct}% przeszukanego zakresu`);
+    });
+    const lastFound = p.newlyFound[p.newlyFound.length - 1];
+    document.getElementById('scanner-last-found').textContent =
+      `Ostatni zeskanowany mecz: ${lastFound.gameId} | Data meczu: ${formatDateDMY(lastFound.gameCreationDate)}`;
+  }
   addFoundGamesToHistoryTable(p.newlyFound);
 });
 
@@ -830,3 +908,6 @@ window.api.collector.onSyncResult(({ matchResult, playersResult }) => {
 
 refreshLcuStatus();
 loadMatches();
+
+/** Mecze znalezione przez skaner w poprzedniej sesji, jeszcze niezaimportowane (przetrwały restart/awarię zasilania - patrz scanFoundStore.js). */
+window.api.scanner.listSavedFound().then(addFoundGamesToHistoryTable);

@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <title>WodneCustomy - Import / Zarządzanie</title>
+  <link rel="icon" type="image/jpeg" href="logo.jpg" />
+  <link rel="stylesheet" href="css/admin.css" />
+</head>
+<body>
+  <header>
+    <h1>WodneCustomy</h1>
+    <nav>
+      <ul>
+        <li><a href="index.html">Mecze</a></li>
+        <li><a href="import.html">Import / Zarządzanie</a></li>
+        <li><a href="players.html">Gracze</a></li>
+        <li><a href="index.html#leaderboard">Ranking</a></li>
+        <li><a href="index.html#draft">Losowanie</a></li>
+        <li><a href="settings.html">Ustawienia</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <section id="lcu-section">
+      <h2>Status klienta League of Legends</h2>
+      <dl>
+        <dt>Połączenie z LCU</dt>
+        <dd id="lcu-connected">nieznane</dd>
+        <dt>Faza gry</dt>
+        <dd id="lcu-phase">-</dd>
+        <dt>Zbieranie danych</dt>
+        <dd id="collector-status">bezczynny</dd>
+      </dl>
+    </section>
+
+    <section id="matches-section">
+      <h2>Synchronizacja z Google Sheets</h2>
+      <p>
+        Przeglądanie meczów i akcje per mecz (notatki, edycja, usuwanie, wysyłka) są teraz
+        w głównej <a href="index.html">Przeglądarce meczy</a> - w menu "⋯" przy każdym meczu.
+        Tu zostaje tylko odświeżenie listy (potrzebne dla wyboru meczu legacy do scalenia
+        poniżej) i zbiorcza wysyłka wszystkich meczów naraz.
+      </p>
+      <p>
+        <button id="refresh-btn" type="button">Odśwież listę</button>
+        <button id="push-all-btn" type="button">Wyślij wszystkie mecze do Google Sheets</button>
+      </p>
+      <p id="matches-count-status">Wczytywanie...</p>
+    </section>
+
+    <section id="history-import-section">
+      <h2>Import z historii klienta League</h2>
+      <p>
+        Pozwala doimportować mecze, w których apka nie była uruchomiona
+        w chwili zakończenia gry (np. gdy Cię przy tym nie było) - z pełnymi
+        statystykami, tak jak przy zwykłym automatycznym przechwytywaniu.
+        Wymaga uruchomionego i zalogowanego klienta League of Legends. To
+        lokalna historia zapisana przez sam klient - dla starszych dat lista
+        może się urwać wcześniej, niż faktyczna liczba rozegranych meczów by
+        sugerowała, jeśli klient nie trzyma ich już w swoim cache.
+      </p>
+      <p>
+        <label for="history-lookup-gameid">Sprawdź datę pojedynczego meczu po Game ID (bez importu):</label>
+        <input type="text" id="history-lookup-gameid" placeholder="np. 3880767863" />
+        <button id="history-lookup-btn" type="button">Sprawdź</button>
+        <button id="history-lookup-import-btn" type="button">Importuj</button>
+        <select id="history-lookup-legacy-select"></select>
+        <button id="history-lookup-merge-btn" type="button">Połącz</button>
+        <span id="history-lookup-result"></span>
+      </p>
+
+      <p><button id="history-list-btn" type="button">Wczytaj ostatnie 20 meczów z klienta</button></p>
+      <p>
+        <label for="history-since-date">albo wszystkie mecze od daty:</label>
+        <input type="date" id="history-since-date" />
+        <button id="history-since-btn" type="button">Wczytaj mecze od tej daty</button>
+      </p>
+      <p>
+        <label for="history-only-custom">
+          <input type="checkbox" id="history-only-custom" />
+          Pokaż tylko gry custom
+        </label>
+      </p>
+      <p id="history-list-status"></p>
+      <div class="table-scroll">
+      <table id="history-table" border="1">
+        <thead>
+          <tr>
+            <th>Game ID</th>
+            <th>Data</th>
+            <th>Tryb</th>
+            <th>Custom?</th>
+            <th>Mapa</th>
+            <th>Czas trwania</th>
+            <th>Akcje</th>
+          </tr>
+        </thead>
+        <tbody id="history-tbody"></tbody>
+      </table>
+      </div>
+    </section>
+
+    <section id="scanner-section">
+      <h2>Skanowanie zakresu Game ID</h2>
+      <p>
+        Ostatnia deska ratunku, gdy powyższa historia klienta się urywa (twardy
+        limit lokalnego cache League): sprawdza po kolei każdy Game ID w
+        podanym zakresie przez <code>/lol-match-history/v1/games/{id}</code> i
+        zapamiętuje te, w których brało udział <b>aktualnie zalogowane
+        konto</b>. Ważne ograniczenie: to konto musi było osobiście grać w
+        danym meczu - meczów hostowanych/nagranych przez kogoś innego, w
+        których to konto nie grało, ten skan nigdy nie znajdzie (do tego
+        służy import .rofl / starych plików JSON wyżej).
+      </p>
+      <p>
+        <code>gameId</code> jest globalnym licznikiem dla całego serwera, nie
+        jest powiązany z datą ani z Twoim kontem - zakres odpowiadający kilku
+        dniom grania może obejmować miliony cudzych meczów do przelecenia po
+        kolei. Dlatego skan działa powoli (ograniczona liczba zapytań na
+        sekundę, żeby nie obciążać serwerów Riota) i może trwać godzinami albo
+        dniami - da się go bezpiecznie zatrzymać i wznowić później od
+        ostatniego sprawdzonego ID, nawet po zamknięciu apki.
+      </p>
+      <p>
+        <label for="scanner-start-id">Od Game ID:</label>
+        <input type="text" id="scanner-start-id" placeholder="np. 3880767863" size="15" />
+        <label for="scanner-end-id">do Game ID:</label>
+        <input type="text" id="scanner-end-id" placeholder="np. 3889689613" size="15" />
+        <label for="scanner-rate">zapytań/s:</label>
+        <input type="number" id="scanner-rate" value="2" min="1" max="10" size="3" />
+      </p>
+      <p>
+        <button id="scanner-start-btn" type="button">Rozpocznij skanowanie</button>
+        <button id="scanner-resume-btn" type="button">Wznów od zapisanego postępu</button>
+        <button id="scanner-stop-btn" type="button" disabled>Zatrzymaj</button>
+      </p>
+      <p id="scanner-status">Brak zapisanego postępu skanowania.</p>
+      <p id="scanner-last-found"></p>
+    </section>
+
+    <section id="rofl-import-section">
+      <h2>Import z plików .rofl</h2>
+      <p>
+        Import próbuje najpierw historii klienta League po identyfikatorze
+        gry z nazwy pliku (pełniejszy kształt danych - osobne bany
+        drużynowe), a jeśli to się nie uda (np. zalogowane konto nie brało
+        udziału w tej grze), sięga po statystyki graczy zaszyte wprost w
+        samym pliku .rofl. Kolumna "Źródło danych" w tabeli meczów pokazuje,
+        której metody ostatecznie użyto. Przed zapisem zobaczysz podgląd
+        danych meczu i będziesz mógł zdecydować, czy go zaimportować.
+      </p>
+
+      <table id="rofl-layout-table" class="layout-table" border="1">
+        <tr>
+          <td width="55%" valign="top">
+            <h3>Z folderu Replays (skonfigurowanego w Ustawieniach)</h3>
+            <p>
+              <button id="rofl-scan-folder-btn" type="button">Wczytaj listę z folderu</button>
+              <span id="rofl-folder-result"></span>
+            </p>
+            <table id="rofl-folder-table" border="1">
+              <thead>
+                <tr>
+                  <th>Plik</th>
+                  <th>Game ID</th>
+                  <th>W bazie?</th>
+                  <th>Akcje</th>
+                </tr>
+              </thead>
+              <tbody id="rofl-folder-tbody"></tbody>
+            </table>
+
+            <h3>Wybierz plik ręcznie</h3>
+            <p>
+              <button id="rofl-pick-btn" type="button">Wybierz plik .rofl</button>
+              <span id="rofl-import-result"></span>
+            </p>
+          </td>
+          <td width="45%" valign="top">
+            <h3>Podgląd wybranego meczu</h3>
+            <section id="rofl-preview-container">
+              <p>Kliknij „Podgląd” przy meczu z listy, aby zobaczyć tutaj jego dane.</p>
+            </section>
+          </td>
+        </tr>
+      </table>
+
+      <table id="rofl-import-table" border="1">
+        <thead>
+          <tr>
+            <th>Plik</th>
+            <th>Mecz</th>
+            <th>Wynik importu</th>
+            <th>Akcje</th>
+          </tr>
+        </thead>
+        <tbody id="rofl-import-tbody"></tbody>
+      </table>
+    </section>
+
+    <section id="legacyjson-import-section">
+      <h2>Import ze starych plików JSON</h2>
+      <p>
+        Pozwala doimportować mecze zapisane kiedyś jako pliki .json innym
+        narzędziem (poza tą apką). Te pliki zawierają już pełne statystyki,
+        więc import działa nawet bez uruchomionego klienta League. Przed
+        zapisem zobaczysz podgląd danych meczu i będziesz mógł zdecydować,
+        czy go zaimportować.
+      </p>
+
+      <table id="legacyjson-layout-table" class="layout-table" border="1">
+        <tr>
+          <td width="55%" valign="top">
+            <h3>Z folderu skonfigurowanego w Ustawieniach</h3>
+            <p>
+              <button id="legacyjson-scan-folder-btn" type="button">Wczytaj listę z folderu</button>
+              <span id="legacyjson-folder-result"></span>
+            </p>
+            <table id="legacyjson-folder-table" border="1">
+              <thead>
+                <tr>
+                  <th>Plik</th>
+                  <th>Game ID</th>
+                  <th>W bazie?</th>
+                  <th>Akcje</th>
+                </tr>
+              </thead>
+              <tbody id="legacyjson-folder-tbody"></tbody>
+            </table>
+
+            <h3>Wybierz plik ręcznie</h3>
+            <p>
+              <button id="legacyjson-pick-btn" type="button">Wybierz plik .json</button>
+              <span id="legacyjson-import-result"></span>
+            </p>
+          </td>
+          <td width="45%" valign="top">
+            <h3>Podgląd wybranego meczu</h3>
+            <section id="legacyjson-preview-container">
+              <p>Kliknij „Podgląd” przy meczu z listy, aby zobaczyć tutaj jego dane.</p>
+            </section>
+          </td>
+        </tr>
+      </table>
+
+      <table id="legacyjson-import-table" border="1">
+        <thead>
+          <tr>
+            <th>Plik</th>
+            <th>Mecz</th>
+            <th>Wynik importu</th>
+            <th>Akcje</th>
+          </tr>
+        </thead>
+        <tbody id="legacyjson-import-tbody"></tbody>
+      </table>
+    </section>
+
+    <section id="leaguesheet-import-section">
+      <h2>Import arkusza ligi (Lewa/Prawa)</h2>
+      <p>
+        Import ręcznie prowadzonego arkusza meczów sprzed tej apki (plik
+        .csv/.tsv z kolumnami GID, Patch, Data, WIN, Top_L.../Top_P... itd.).
+        Ta lista nie zna prawdziwej strony Blue/Red - miała tylko losowo
+        przydzieloną "Lewą"/"Prawą" stronę, więc zapisujemy ją właśnie jako
+        taką (osobne sekcje "Strona lewa"/"Strona prawa" w szczegółach meczu,
+        nie "Drużyna niebieska/czerwona"). Gracze nie mają tu prawdziwego
+        konta League (same nicki) - statystyki tej samej osoby połączą się
+        między meczami z tego arkusza, ale nie automatycznie z jej prawdziwym
+        kontem. Jeśli kolumna <code>LoLID</code> jest wypełniona prawdziwym
+        Game ID (np. znalezionym wcześniej przez skaner albo z nazwy pliku
+        .rofl), użyjemy go jako identyfikatora meczu - dzięki temu późniejsze
+        znalezienie pełnych danych tej samej gry nadpisze ten wpis zamiast
+        tworzyć duplikat.
+      </p>
+      <p>
+        <button id="leaguesheet-pick-btn" type="button">Wybierz plik arkusza</button>
+        <span id="leaguesheet-pick-result"></span>
+      </p>
+      <p>
+        <button id="leaguesheet-select-all-btn" type="button">Zaznacz wszystkie</button>
+        <button id="leaguesheet-select-none-btn" type="button">Odznacz wszystkie</button>
+        <button id="leaguesheet-import-btn" type="button">Zaimportuj zaznaczone</button>
+      </p>
+      <p id="leaguesheet-status"></p>
+      <table id="leaguesheet-table" border="1">
+        <thead>
+          <tr>
+            <th></th>
+            <th>GID</th>
+            <th>Data</th>
+            <th>Wygrana</th>
+            <th>Strona lewa</th>
+            <th>Strona prawa</th>
+            <th>Mecz ID</th>
+            <th>W bazie?</th>
+          </tr>
+        </thead>
+        <tbody id="leaguesheet-tbody"></tbody>
+      </table>
+    </section>
+
+    <section id="log-section">
+      <h2>Dziennik zdarzeń</h2>
+      <ul id="log-list"></ul>
+    </section>
+  </main>
+
+  <script src="js/common.js"></script>
+  <script src="js/ddragon.js"></script>
+  <script src="js/import.js"></script>
+</body>
+</html>

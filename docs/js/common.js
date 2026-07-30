@@ -206,6 +206,45 @@ async function getProfileIconUrl(profileIconId) {
   return `https://ddragon.leagueoflegends.com/cdn/${version}/img/profileicon/${profileIconId}.png`;
 }
 
+// ---- Splash arty championów (Data Dragon) ----
+
+let championKeyMapCache = null;
+async function getChampionKeyMap() {
+  if (championKeyMapCache) return championKeyMapCache;
+  const version = await getDdragonVersion();
+  championKeyMapCache = {};
+  try {
+    const res = await fetch(`https://ddragon.leagueoflegends.com/cdn/${version}/data/en_US/champion.json`);
+    const data = await res.json();
+    Object.values(data.data || {}).forEach((c) => { championKeyMapCache[c.name] = c.id; });
+  } catch (err) {
+    // brak internetu - portrety championów po prostu się nie wyświetlą
+  }
+  return championKeyMapCache;
+}
+
+async function getChampionKey(championName) {
+  const map = await getChampionKeyMap();
+  return map[championName] || (championName || '').replace(/[^a-zA-Z0-9]/g, '');
+}
+
+/** Duży portret (splash art) championa - w przeciwieństwie do kwadratowej ikonki, nie zależy od wersji patcha. */
+async function getChampionSplashUrl(championName) {
+  if (!championName) return '';
+  const key = await getChampionKey(championName);
+  return `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${key}_0.png`;
+}
+
+/** Obrazek tylko z szerokością ustawioną jako atrybut - bez height przeglądarka skaluje proporcjonalnie, więc prostokątny splash art nie wychodzi ściśnięty do kwadratu. */
+function imgWidth(url, width, alt) {
+  if (!url) return '';
+  const el = document.createElement('img');
+  el.src = url;
+  el.width = width;
+  el.alt = alt || '';
+  return el.outerHTML;
+}
+
 /**
  * Zwraca URL awatara gracza zgodnie z wybranym domyślnym źródłem (pole "avatarSource"):
  * "discord" (zapisany awatar z Discorda) albo domyślnie "lol" (ikona profilu z League).

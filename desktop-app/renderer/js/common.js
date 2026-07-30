@@ -23,6 +23,16 @@ function formatDate(iso) {
   }
 }
 
+/** Sama data (bez godziny) w formacie dd-mm-rrrr - jak formatDate, tylko krótsza. */
+function formatDateDMY(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  return `${day}-${month}-${d.getFullYear()}`;
+}
+
 function qs(name) {
   return new URLSearchParams(window.location.search).get(name);
 }

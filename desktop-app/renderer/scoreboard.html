@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <title>WodneCustomy - Scoreboard</title>
+</head>
+<body>
+  <header>
+    <h1>WodneCustomy</h1>
+    <nav>
+      <ul>
+        <li><a href="index.html">Mecze</a></li>
+        <li><a href="import.html">Import / Zarządzanie</a></li>
+        <li><a href="players.html">Gracze</a></li>
+        <li><a href="index.html#leaderboard">Ranking</a></li>
+        <li><a href="index.html#draft">Losowanie</a></li>
+        <li><a href="settings.html">Ustawienia</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <section id="status-section">
+      <p id="status-message">Wczytywanie...</p>
+    </section>
+
+    <section id="match-header-section">
+      <table border="1">
+        <tr>
+          <td>
+            <dl>
+              <dt>Data</dt><dd id="header-date"></dd>
+              <dt>Czas trwania</dt><dd id="header-duration"></dd>
+              <dt>Mapa</dt><dd id="header-map"></dd>
+              <dt>Patch</dt><dd id="header-patch"></dd>
+              <dt>Game ID</dt><dd id="header-gameid"></dd>
+            </dl>
+          </td>
+          <td valign="top" align="right">
+            <p><a id="advanced-details-link" href="#">VIEW ADVANCED DETAILS</a></p>
+          </td>
+        </tr>
+      </table>
+    </section>
+
+    <section id="bans-section"></section>
+
+    <section id="tabs-section">
+      <p><b>SCOREBOARD</b> | <span>PROGRESSION (niedostępne - brak danych timeline)</span></p>
+    </section>
+
+    <section id="teams-section"></section>
+  </main>
+
+  <script src="js/common.js"></script>
+  <script src="js/ddragon.js"></script>
+  <script src="js/scoreboard.js"></script>
+</body>
+</html>

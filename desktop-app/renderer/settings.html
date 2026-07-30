@@ -1,140 +1,37 @@
 <!doctype html>
 <html lang="pl">
 <head>
-  <meta charset="utf-8" />
-  <title>WodneCustomy - Ustawienia</title>
+<meta charset="utf-8" />
+<title>WodneCustomy - Ustawienia</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" type="image/jpeg" href="logo.jpg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; background: #0A0B0E; }
+  body { font-family: "Manrope", system-ui, sans-serif; color: #EDEFF4; -webkit-font-smoothing: antialiased; }
+  a { color: inherit; text-decoration: none; }
+  ::selection { background: rgba(61,220,151,.3); }
+  .lolscroll::-webkit-scrollbar { width: 10px; height: 10px; }
+  .lolscroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,.10); border-radius: 20px; border: 2px solid transparent; background-clip: padding-box; }
+  .lolscroll::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.20); background-clip: padding-box; }
+  @keyframes lolFade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+  }
+  @keyframes lolPop { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
+  @keyframes lolSpin { to { transform: rotate(360deg); } }
+</style>
 </head>
 <body>
-  <header>
-    <h1>WodneCustomy</h1>
-    <nav>
-      <ul>
-        <li><a href="index.html">Mecze</a></li>
-        <li><a href="players.html">Gracze</a></li>
-        <li><a href="randomizer.html">Losowanie</a></li>
-        <li><a href="stats.html">Statystyki</a></li>
-        <li><a href="settings.html">Ustawienia</a></li>
-      </ul>
-    </nav>
-  </header>
+<div id="root"></div>
 
-  <main>
-    <section id="settings-section">
-      <h2>Ustawienia</h2>
-      <form id="settings-form">
-        <fieldset>
-          <legend>Google Apps Script</legend>
-          <p>
-            <label for="appsScriptUrl">Adres URL wdrożonej aplikacji internetowej (.../exec)</label><br />
-            <input type="text" id="appsScriptUrl" name="appsScriptUrl" size="80" />
-          </p>
-          <p>
-            <label for="sharedSecret">Sekret (SHARED_SECRET ustawiony w Apps Script)</label><br />
-            <input type="text" id="sharedSecret" name="sharedSecret" size="60" />
-          </p>
-          <p>
-            <label for="autoSync">
-              <input type="checkbox" id="autoSync" name="autoSync" />
-              Automatycznie wysyłaj dane do Google Sheets zaraz po zakończeniu gry
-            </label>
-          </p>
-          <p><button type="button" id="test-connection-btn">Testuj połączenie</button> <span id="test-connection-result"></span></p>
-        </fieldset>
-
-        <fieldset>
-          <legend>Discord (opcjonalnie - drugie źródło awatarów)</legend>
-          <p>
-            <label for="discordClientId">Discord Client ID (z discord.com/developers/applications)</label><br />
-            <input type="text" id="discordClientId" name="discordClientId" size="40" />
-          </p>
-          <p>
-            Wymaga uruchomionego i zalogowanego desktopowego klienta Discord oraz
-            zalogowanego klienta League of Legends na tym komputerze - avatar
-            Discorda zostanie zapisany dla aktualnie zalogowanego gracza League.
-          </p>
-          <p>
-            <button type="button" id="discord-connect-btn">Połącz z Discordem i zapisz mój avatar</button>
-            <span id="discord-connect-result"></span>
-          </p>
-        </fieldset>
-
-        <fieldset>
-          <legend>Discord - bot serwera (opcjonalnie, awatary dla wszystkich naraz)</legend>
-          <p>
-            <label for="discordBotToken">Token bota Discord</label><br />
-            <input type="password" id="discordBotToken" name="discordBotToken" size="60" />
-          </p>
-          <p>
-            <label for="discordGuildId">ID serwera Discord (Guild ID)</label><br />
-            <input type="text" id="discordGuildId" name="discordGuildId" size="40" />
-          </p>
-          <p>
-            Wymaga dodania bota do serwera i wypełnienia pola <b>discordNick</b>
-            (nazwa użytkownika lub nick na serwerze) w zakładce Gracze dla
-            każdego gracza, którego avatar ma zostać dopasowany. Nie wymaga
-            uruchomionego Discorda ani League u pozostałych graczy - działa
-            z jednego komputera dla całej drużyny naraz.
-          </p>
-          <p>
-            <button type="button" id="discord-bot-sync-btn">Pobierz avatary wszystkich graczy (bot)</button>
-            <span id="discord-bot-sync-result"></span>
-          </p>
-        </fieldset>
-
-        <fieldset>
-          <legend>Lokalizacja danych i klienta League</legend>
-          <p>
-            <label for="dataDir">Folder zapisu danych lokalnych (JSON)</label><br />
-            <input type="text" id="dataDir" name="dataDir" size="80" />
-          </p>
-          <p>
-            <label for="customLockfilePath">Własna ścieżka do pliku lockfile klienta League (opcjonalnie)</label><br />
-            <input type="text" id="customLockfilePath" name="customLockfilePath" size="80" placeholder="np. D:/Riot Games/League of Legends/lockfile" />
-          </p>
-        </fieldset>
-
-        <fieldset>
-          <legend>Folder z plikami .rofl</legend>
-          <p>
-            <label for="roflFolderPath">Ścieżka do folderu Replays klienta League</label><br />
-            <input type="text" id="roflFolderPath" name="roflFolderPath" size="80" placeholder="np. C:\Users\Ty\Documents\League of Legends\Replays" />
-            <button type="button" id="rofl-detect-folder-btn">Wykryj automatycznie</button>
-          </p>
-          <p>
-            Po ustawieniu tej ścieżki w zakładce <b>Mecze</b> pojawi się lista
-            wszystkich plików .rofl z tego folderu - będziesz mógł podejrzeć
-            dane każdego meczu i wybrać, które zaimportować do bazy.
-          </p>
-        </fieldset>
-
-        <fieldset>
-          <legend>Folder ze starymi plikami JSON meczów</legend>
-          <p>
-            <label for="legacyJsonFolderPath">Ścieżka do folderu ze starymi plikami JSON (zapisanymi kiedyś innym narzędziem)</label><br />
-            <input type="text" id="legacyJsonFolderPath" name="legacyJsonFolderPath" size="80" placeholder="np. C:\Users\Ty\Desktop\Custom Json" />
-            <button type="button" id="legacyjson-detect-folder-btn">Wykryj automatycznie</button>
-          </p>
-          <p>
-            Po ustawieniu tej ścieżki w zakładce <b>Mecze</b> pojawi się lista
-            wszystkich plików .json z tego folderu - będziesz mógł podejrzeć
-            dane każdego meczu i wybrać, które zaimportować do bazy. W
-            przeciwieństwie do importu .rofl / z historii klienta, te pliki
-            zawierają już pełne statystyki, więc import działa nawet bez
-            uruchomionego klienta League.
-          </p>
-        </fieldset>
-
-        <p><button type="submit">Zapisz ustawienia</button></p>
-      </form>
-    </section>
-
-    <section id="log-section">
-      <h2>Dziennik zdarzeń</h2>
-      <ul id="log-list"></ul>
-    </section>
-  </main>
-
-  <script src="js/common.js"></script>
-  <script src="js/settings.js"></script>
+<script src="vendor/react.production.min.js"></script>
+<script src="vendor/react-dom.production.min.js"></script>
+<script src="js/browser/helpers.js"></script>
+<script src="js/browser/SynthwaveBackground.js"></script>
+<script src="js/browser/SettingsApp.js"></script>
 </body>
 </html>
