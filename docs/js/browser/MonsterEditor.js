@@ -11,6 +11,31 @@ function monsterImg(app, nick, size) {
     uri ? h("img", { src: uri, alt: nick, loading: "lazy", decoding: "async", style: { width: "100%", height: "100%", objectFit: "cover", display: "block" } }) : null);
 }
 
+/** Przekłada motyw kolorystyczny stworka (monsters.js THEMES) na paletę tła synthwave (SynthwaveBackground.js) - żeby słońce/siatka na profilu gracza grały w barwach jego bestii. */
+function paletteFromMonsterTheme(themeKey) {
+  const theme = window.Monsters && window.Monsters.THEMES && window.Monsters.THEMES[themeKey];
+  if (!theme) return null;
+  return {
+    skyTop: theme.b, skyMid: theme.a, skyBottom: theme.ac,
+    sunTop: theme.core, sunMid: theme.eye, sunBottom: theme.stroke,
+    glow: theme.glow,
+    seaTop: theme.dk, seaMid: theme.body, seaBottom: theme.b,
+    grid: theme.stroke, star: theme.core, particle: theme.eye, horizonGlow: theme.core
+  };
+}
+
+/** Paleta tła dla aktualnej trasy - w barwach stworka przeglądanego gracza na #player/:id, inaczej null (domyślna niebieska). Podczas "Podgląd tła" w edytorze ma priorytet motyw aktualnie edytowany (na żywo, nawet niezapisany). */
+function backgroundPaletteForRoute(app) {
+  if (app.state.monsterBgPreview && app.state.monsterEdit) return paletteFromMonsterTheme(app.state.monsterEdit.params.theme);
+  if (app.state.route.view !== "player" || !app.state.agg) return null;
+  const players = app.state.agg.players;
+  const id = app.state.route.id;
+  const pl = players[id] || Object.values(players).find((x) => x.nick === id || x.puuid === id);
+  if (!pl) return null;
+  const params = window.Monsters && window.Monsters.paramsFor ? window.Monsters.paramsFor(pl.nick || pl.summoner) : null;
+  return params ? paletteFromMonsterTheme(params.theme) : null;
+}
+
 function openMonsterEditor(app, nick) {
   const params = JSON.parse(JSON.stringify(window.Monsters.paramsFor(nick)));
   app.setState({ monsterEdit: { nick, params } });
@@ -57,9 +82,25 @@ function exportMonsterToFile(app) {
   } catch (e) { app.toast("Błąd eksportu", true); }
 }
 
+/**
+ * Na GitHub Pages (gdzie nie widać efektu na "prawdziwym" profilu gracza - patrz
+ * backgroundPaletteForRoute, działa tylko na #player/:id) chowamy modal, żeby zobaczyć tło
+ * synthwave w barwach AKTUALNIE edytowanego motywu na żywo (App.js sprawdza monsterBgPreview
+ * przed backgroundPaletteForRoute). Mały przycisk w rogu wraca do edycji.
+ */
+function renderMonsterBgPreview(app) {
+  const t = app.theme();
+  return h("button", {
+    onClick: () => app.setState({ monsterBgPreview: false }),
+    title: "Wróć do edycji stworka",
+    style: { position: "fixed", bottom: 26, left: "50%", transform: "translateX(-50%)", zIndex: 61, cursor: "pointer", padding: "13px 24px", borderRadius: 999, border: "1px solid rgba(90,200,255,.5)", background: "rgba(8,10,22,.85)", backdropFilter: "blur(10px)", color: "#dff3ff", fontWeight: 800, fontSize: 13.5, fontFamily: t.disp, boxShadow: "0 12px 40px rgba(0,0,0,.5)" }
+  }, "👁 Podgląd tła — kliknij, aby wrócić do edycji");
+}
+
 function renderMonsterEditorModal(app) {
   const t = app.theme();
   const me = app.state.monsterEdit; const s = me.params;
+  if (app.state.monsterBgPreview) return renderMonsterBgPreview(app);
   const M = window.Monsters; const THEMES = M.THEMES; const O = M.OPTIONS;
   const close = () => app.setState({ monsterEdit: null });
   const pill = (active, onClick, label) => h("button", { key: label, onClick, style: { cursor: "pointer", padding: "6px 11px", borderRadius: 8, border: "1px solid " + (active ? t.accent : t.line2), background: active ? t.accent + "22" : "transparent", color: active ? t.text : t.mut, fontSize: 12, fontWeight: 700, fontFamily: t.disp } }, label);
@@ -79,7 +120,8 @@ function renderMonsterEditorModal(app) {
             h("div", { dangerouslySetInnerHTML: { __html: (M.buildSVG(s) || "").replace('width="300" height="400"', 'width="100%" height="100%" style="display:block"') }, style: { width: "100%", height: "100%", lineHeight: 0 } })),
           h("div", { style: { display: "flex", gap: 8 } },
             h("button", { onClick: () => setMonsterParam(app, M.randomFor(me.nick)), style: { flex: 1, cursor: "pointer", padding: "10px", borderRadius: 10, border: "1px solid " + t.line2, background: "transparent", color: t.text, fontWeight: 700, fontSize: 12.5, fontFamily: t.disp } }, "⚄ Losuj"),
-            h("button", { onClick: () => resetMonster(app), style: { flex: 1, cursor: "pointer", padding: "10px", borderRadius: 10, border: "1px solid " + t.line2, background: "transparent", color: t.mut, fontWeight: 700, fontSize: 12.5, fontFamily: t.disp } }, "↺ Domyślny"))),
+            h("button", { onClick: () => resetMonster(app), style: { flex: 1, cursor: "pointer", padding: "10px", borderRadius: 10, border: "1px solid " + t.line2, background: "transparent", color: t.mut, fontWeight: 700, fontSize: 12.5, fontFamily: t.disp } }, "↺ Domyślny")),
+          typeof window.api === "undefined" ? h("button", { onClick: () => app.setState({ monsterBgPreview: true }), title: "Pokaż tło synthwave w barwach tego motywu", style: { cursor: "pointer", padding: "10px", borderRadius: 10, border: "1px solid rgba(90,200,255,.4)", background: "rgba(90,200,255,.1)", color: "#dff3ff", fontWeight: 700, fontSize: 12.5, fontFamily: t.disp } }, "👁 Podgląd tła") : null),
         h("div", { className: "lolscroll", style: { display: "flex", flexDirection: "column", gap: 16, maxHeight: "56vh", overflowY: "auto", paddingRight: 4 } },
           h("div", null,
             h("div", { style: monoLabel(t) }, "Motyw"),

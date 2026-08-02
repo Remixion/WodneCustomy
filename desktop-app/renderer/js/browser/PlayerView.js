@@ -84,7 +84,7 @@ function renderPlayerView(app, id) {
     ["Wardy / mecz", av.wardsPlaced, ra.wardsPlaced, true, (v) => v.toFixed(1)]
   ];
   return h("div", { style: { padding: "30px 40px 60px", maxWidth: 1180, margin: "0 auto", animation: "lolFade .35s ease" } },
-    h("button", { onClick: () => app.nav("leaderboard"), style: backBtn(t) }, "← Ranking graczy"),
+    h("button", { onClick: () => app.nav("profiles"), style: backBtn(t) }, "← Profile"),
     h("div", { style: { display: "flex", alignItems: "center", gap: 22, margin: "16px 0 28px", flexWrap: "wrap" } },
       playerAvatar(app, pl.nick || pl.summoner, 84),
       h("div", null,

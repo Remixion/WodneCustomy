@@ -81,7 +81,7 @@ class BrowserApp extends React.Component {
   renderApp() {
     if (!this.state.ready) return this.renderLoading();
     return h("div", { className: "lolscroll", style: { display: "flex", flexDirection: "column", minHeight: "100vh", background: "transparent", position: "relative" } },
-      h(SynthwaveBackground, null),
+      h(SynthwaveBackground, { palette: backgroundPaletteForRoute(this) }),
       h("audio", { ref: this.audioRef, src: "assets/neon-waterfall.mp3", loop: true, preload: "auto", onTimeUpdate: () => { if (!this._savedT || Date.now() - this._savedT > 4000) { this._savedT = Date.now(); saveAudioPos(this); } }, onLoadedMetadata: (e) => { try { const p = parseFloat(localStorage.getItem("wcAudioPos") || "0"); if (p && p < e.target.duration) e.target.currentTime = p; } catch (er) {} if (!this.state.muted) playBgAudio(this, e.target); }, style: { display: "none" } }),
       this.renderSidebar(),
       h("main", { className: "lolscroll", style: { flex: 1, minWidth: 0, position: "relative", zIndex: 1 } }, this.renderView()),
@@ -106,7 +106,7 @@ class BrowserApp extends React.Component {
     const active = this.state.route.view;
     const neon = "#5ac8ff";
     const NavBtn = ([view, label]) => {
-      const on = active === view || (view === "matches" && active === "match") || (view === "leaderboard" && active === "player");
+      const on = active === view || (view === "matches" && active === "match") || (view === "profiles" && active === "player");
       return h("button", {
         key: view, onClick: () => this.nav(view),
         style: { position: "relative", cursor: "pointer", padding: "9px 15px", borderRadius: 10, border: "1px solid " + (on ? "rgba(90,200,255,.5)" : "transparent"), background: on ? "rgba(90,200,255,.12)" : "transparent", color: on ? "#dff3ff" : t.mut, fontWeight: 700, fontSize: 14, fontFamily: t.disp, letterSpacing: .2, transition: "all .15s", textShadow: on ? "0 0 10px rgba(90,200,255,.6)" : "none" },
