@@ -86,15 +86,32 @@ function exportMonsterToFile(app) {
  * Na GitHub Pages (gdzie nie widać efektu na "prawdziwym" profilu gracza - patrz
  * backgroundPaletteForRoute, działa tylko na #player/:id) chowamy modal, żeby zobaczyć tło
  * synthwave w barwach AKTUALNIE edytowanego motywu na żywo (App.js sprawdza monsterBgPreview
- * przed backgroundPaletteForRoute). Mały przycisk w rogu wraca do edycji.
+ * przed backgroundPaletteForRoute). Podgląd trwa dopóki przycisk jest wciśnięty (press-and-hold) -
+ * puszczenie w dowolny sposób (mysz/dotyk/opuszczenie okna) wraca do edycji.
  */
+function startMonsterBgPreview(app) {
+  if (app._monsterBgPreviewStop) return;
+  app.setState({ monsterBgPreview: true });
+  const stop = () => {
+    app.setState({ monsterBgPreview: false });
+    window.removeEventListener("mouseup", stop);
+    window.removeEventListener("touchend", stop);
+    window.removeEventListener("touchcancel", stop);
+    window.removeEventListener("blur", stop);
+    app._monsterBgPreviewStop = null;
+  };
+  app._monsterBgPreviewStop = stop;
+  window.addEventListener("mouseup", stop);
+  window.addEventListener("touchend", stop);
+  window.addEventListener("touchcancel", stop);
+  window.addEventListener("blur", stop);
+}
+
 function renderMonsterBgPreview(app) {
   const t = app.theme();
-  return h("button", {
-    onClick: () => app.setState({ monsterBgPreview: false }),
-    title: "Wróć do edycji stworka",
-    style: { position: "fixed", bottom: 26, left: "50%", transform: "translateX(-50%)", zIndex: 61, cursor: "pointer", padding: "13px 24px", borderRadius: 999, border: "1px solid rgba(90,200,255,.5)", background: "rgba(8,10,22,.85)", backdropFilter: "blur(10px)", color: "#dff3ff", fontWeight: 800, fontSize: 13.5, fontFamily: t.disp, boxShadow: "0 12px 40px rgba(0,0,0,.5)" }
-  }, "👁 Podgląd tła — kliknij, aby wrócić do edycji");
+  return h("div", {
+    style: { position: "fixed", bottom: 26, left: "50%", transform: "translateX(-50%)", zIndex: 61, pointerEvents: "none", padding: "13px 24px", borderRadius: 999, border: "1px solid rgba(90,200,255,.5)", background: "rgba(8,10,22,.85)", backdropFilter: "blur(10px)", color: "#dff3ff", fontWeight: 800, fontSize: 13.5, fontFamily: t.disp, boxShadow: "0 12px 40px rgba(0,0,0,.5)" }
+  }, "👁 Podgląd tła — puść przycisk, aby wrócić do edycji");
 }
 
 function renderMonsterEditorModal(app) {
@@ -121,7 +138,7 @@ function renderMonsterEditorModal(app) {
           h("div", { style: { display: "flex", gap: 8 } },
             h("button", { onClick: () => setMonsterParam(app, M.randomFor(me.nick)), style: { flex: 1, cursor: "pointer", padding: "10px", borderRadius: 10, border: "1px solid " + t.line2, background: "transparent", color: t.text, fontWeight: 700, fontSize: 12.5, fontFamily: t.disp } }, "⚄ Losuj"),
             h("button", { onClick: () => resetMonster(app), style: { flex: 1, cursor: "pointer", padding: "10px", borderRadius: 10, border: "1px solid " + t.line2, background: "transparent", color: t.mut, fontWeight: 700, fontSize: 12.5, fontFamily: t.disp } }, "↺ Domyślny")),
-          typeof window.api === "undefined" ? h("button", { onClick: () => app.setState({ monsterBgPreview: true }), title: "Pokaż tło synthwave w barwach tego motywu", style: { cursor: "pointer", padding: "10px", borderRadius: 10, border: "1px solid rgba(90,200,255,.4)", background: "rgba(90,200,255,.1)", color: "#dff3ff", fontWeight: 700, fontSize: 12.5, fontFamily: t.disp } }, "👁 Podgląd tła") : null),
+          typeof window.api === "undefined" ? h("button", { onMouseDown: () => startMonsterBgPreview(app), onTouchStart: () => startMonsterBgPreview(app), title: "Przytrzymaj, aby zobaczyć tło synthwave w barwach tego motywu", style: { cursor: "pointer", padding: "10px", borderRadius: 10, border: "1px solid rgba(90,200,255,.4)", background: "rgba(90,200,255,.1)", color: "#dff3ff", fontWeight: 700, fontSize: 12.5, fontFamily: t.disp } }, "👁 Przytrzymaj, aby zobaczyć tło") : null),
         h("div", { className: "lolscroll", style: { display: "flex", flexDirection: "column", gap: 16, maxHeight: "56vh", overflowY: "auto", paddingRight: 4 } },
           h("div", null,
             h("div", { style: monoLabel(t) }, "Motyw"),
