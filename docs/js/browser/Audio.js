@@ -105,6 +105,16 @@ function readBgAudioLevels(app) {
   return { level: sum / data.length / 255, bass: bassSum / bassBins / 255 };
 }
 
+/** Czy aktualnie oglądany profil ma własną piosenkę (Sheets songUrl / lokalny cache) - gdy tak, główny motyw w tle NIE powinien grać, żeby się nie nakładały (patrz onLoadedMetadata w App.js i ensureBgAudioPlaying niżej). */
+function currentProfileHasSong(app) {
+  const route = app.state.route;
+  if (!route || route.view !== "player" || !route.id || !app.state.agg) return false;
+  const players = app.state.agg.players;
+  const pl = players[route.id] || Object.values(players).find((x) => x.nick === route.id || x.puuid === route.id);
+  const nick = pl ? (pl.nick || pl.summoner) : route.id;
+  return !!(nick && getSong(app, nick));
+}
+
 function ensureBgAudioPlaying(app) {
   const el = app.audioRef.current;
   if (!el) return;
@@ -113,7 +123,7 @@ function ensureBgAudioPlaying(app) {
   // trwale blokowałoby reaktywne tło, nawet gdyby użytkownik później odciszył muzykę ręcznie.
   setupBgAnalyser(app);
   if (app._bgAudioCtx && app._bgAudioCtx.state === "suspended") app._bgAudioCtx.resume().catch(() => {});
-  if (app.state.muted) return;
+  if (app.state.muted || currentProfileHasSong(app)) return;
   el.muted = false;
   if (el.paused) { el.volume = app.state.volume; el.play().catch(() => {}); }
 }
@@ -167,7 +177,7 @@ function applySongVolume(app) {
 function _stopProfileSong(app, keepBg) {
   if (app._songEl) { app._songEl.pause(); app._songEl = null; }
   app._songYtEl = null;
-  if (app.state.songPlaying || app.state.songYoutubeId) app.setState({ songPlaying: null, songYoutubeId: null });
+  if (app.state.songPlaying || app.state.songYoutubeId) app.setState({ songPlaying: null, songYoutubeId: null, songMinimized: false });
   if (!keepBg) _resumeBg(app);
 }
 function _playProfileSong(app, nick) {
@@ -179,7 +189,7 @@ function _playProfileSong(app, nick) {
   const ytId = ytVideoId(song.u);
   if (ytId) {
     // Oficjalny odtwarzacz YouTube w <iframe> - patrz renderYoutubeSongPlayer niżej. Głośność dopinana przez applySongVolume po jego załadowaniu (onLoad).
-    app.setState({ songPlaying: nick, songYoutubeId: ytId });
+    app.setState({ songPlaying: nick, songYoutubeId: ytId, songMinimized: false });
     return;
   }
   const a = new Audio(song.u);
@@ -235,13 +245,17 @@ function renderYoutubeSongPlayer(app) {
   if (!app.state.songYoutubeId) return null;
   const t = app.theme();
   const id = app.state.songYoutubeId;
+  const min = !!app.state.songMinimized;
   const src = "https://www.youtube.com/embed/" + id + "?autoplay=1&loop=1&playlist=" + id + "&enablejsapi=1";
   // enablejsapi=1 + ref na <iframe> pozwala sterować głośnością tego konkretnego odtwarzacza przez postMessage (patrz applySongVolume) - bez tego link do YouTube grałby zawsze na swojej domyślnej głośności, niezależnie od suwaka/wyciszenia w apce.
-  return h("div", { style: { position: "fixed", right: 16, bottom: 16, zIndex: 70, width: 300, borderRadius: 14, overflow: "hidden", border: "1px solid rgba(90,200,255,.4)", boxShadow: "0 14px 40px rgba(0,0,0,.6), 0 0 22px rgba(90,200,255,.25)", background: "#000" } },
-    h("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 10px", background: "rgba(8,10,22,.92)" } },
-      h("span", { style: { fontSize: 11.5, color: t.mut, fontWeight: 700, fontFamily: t.disp } }, "♪ Piosenka profilowa"),
-      h("button", { onClick: () => _stopProfileSong(app), title: "Zatrzymaj", style: { cursor: "pointer", border: "none", background: "transparent", color: t.mut, fontSize: 14, lineHeight: 1 } }, "✕")),
-    h("iframe", { key: id, src, width: "300", height: "169", frameBorder: "0", allow: "autoplay; encrypted-media", title: "Piosenka profilowa (YouTube)", style: { display: "block" }, ref: (el) => { app._songYtEl = el; }, onLoad: () => setTimeout(() => applySongVolume(app), 400) }));
+  // Zminimalizowanie NIE odmontowuje <iframe> (ten sam key co przed minimalizacją) - tylko zwija jego wysokość do 0, więc YouTube dalej gra dźwięk w tle bez przerywania/restartu.
+  return h("div", { style: { position: "fixed", right: 16, bottom: 16, zIndex: 70, width: min ? 220 : 300, borderRadius: 14, overflow: "hidden", border: "1px solid rgba(90,200,255,.4)", boxShadow: "0 14px 40px rgba(0,0,0,.6), 0 0 22px rgba(90,200,255,.25)", background: "#000", transition: "width .2s ease" } },
+    h("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 10px", background: "rgba(8,10,22,.92)", gap: 8 } },
+      h("span", { style: { fontSize: 11.5, color: t.mut, fontWeight: 700, fontFamily: t.disp, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, "♪ Piosenka profilowa"),
+      h("div", { style: { display: "flex", gap: 6, flexShrink: 0 } },
+        h("button", { onClick: () => app.setState({ songMinimized: !min }), title: min ? "Rozwiń" : "Zminimalizuj", style: { cursor: "pointer", border: "none", background: "transparent", color: t.mut, fontSize: 13, lineHeight: 1 } }, min ? "▢" : "—"),
+        h("button", { onClick: () => _stopProfileSong(app), title: "Zatrzymaj", style: { cursor: "pointer", border: "none", background: "transparent", color: t.mut, fontSize: 14, lineHeight: 1 } }, "✕"))),
+    h("iframe", { key: id, src, width: "300", frameBorder: "0", allow: "autoplay; encrypted-media", title: "Piosenka profilowa (YouTube)", style: { display: "block", height: min ? 0 : 169, border: 0 }, ref: (el) => { app._songYtEl = el; }, onLoad: () => setTimeout(() => applySongVolume(app), 400) }));
 }
 
 window.BrowserViews.songEditor = renderSongEditorModal;
