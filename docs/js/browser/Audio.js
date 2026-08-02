@@ -27,7 +27,7 @@ function toggleMute(app) {
     if (muted) { el.pause(); }
     else { el.volume = app.state.volume; const pr = el.play(); if (pr && pr.catch) pr.catch(() => {}); }
   }
-  app.setState({ muted });
+  app.setState({ muted }, () => applySongVolume(app));
 }
 function setVolume(app, v) {
   v = Math.max(0, Math.min(1, v));
@@ -39,7 +39,7 @@ function setVolume(app, v) {
     try { localStorage.setItem("wcMuted", "0"); } catch (e) {}
     if (el) { const pr = el.play(); if (pr && pr.catch) pr.catch(() => {}); }
   }
-  app.setState(patch);
+  app.setState(patch, () => applySongVolume(app));
 }
 function saveAudioPos(app) {
   const el = app.audioRef.current;
@@ -151,8 +151,22 @@ function _resumeBg(app) {
   try { const bg = app.audioRef.current; if (bg && app._bgWasPlaying && !app.state.muted) { bg.play().catch(() => {}); } } catch (e) {}
   app._bgWasPlaying = false;
 }
+
+/** Stosuje AKTUALNĄ głośność/wyciszenie apki (app.state.volume/muted - to samo, co suwak i przycisk wyciszenia muzyki w tle) do piosenki profilowej, jaka akurat gra - bezpośredni plik audio LUB odtwarzacz YouTube. Wywoływane zarówno przy starcie piosenki, jak i przy każdej zmianie głośności/wyciszenia z App.js, żeby piosenka zawsze była zsynchronizowana z resztą apki, a nie miała własnej, oddzielnej głośności. */
+function applySongVolume(app) {
+  const vol = app.state.muted ? 0 : (app.state.volume || 0);
+  if (app._songEl) app._songEl.volume = vol;
+  const yt = app._songYtEl;
+  if (yt && yt.contentWindow) {
+    try {
+      yt.contentWindow.postMessage(JSON.stringify({ event: "command", func: app.state.muted ? "mute" : "unMute", args: [] }), "*");
+      yt.contentWindow.postMessage(JSON.stringify({ event: "command", func: "setVolume", args: [Math.round((app.state.volume || 0) * 100)] }), "*");
+    } catch (e) {}
+  }
+}
 function _stopProfileSong(app, keepBg) {
   if (app._songEl) { app._songEl.pause(); app._songEl = null; }
+  app._songYtEl = null;
   if (app.state.songPlaying || app.state.songYoutubeId) app.setState({ songPlaying: null, songYoutubeId: null });
   if (!keepBg) _resumeBg(app);
 }
@@ -164,16 +178,16 @@ function _playProfileSong(app, nick) {
   try { const bg = app.audioRef.current; if (bg) { app._bgWasPlaying = !bg.paused; bg.pause(); } } catch (e) {}
   const ytId = ytVideoId(song.u);
   if (ytId) {
-    // Oficjalny odtwarzacz YouTube w <iframe> - patrz renderYoutubeSongPlayer niżej.
+    // Oficjalny odtwarzacz YouTube w <iframe> - patrz renderYoutubeSongPlayer niżej. Głośność dopinana przez applySongVolume po jego załadowaniu (onLoad).
     app.setState({ songPlaying: nick, songYoutubeId: ytId });
     return;
   }
   const a = new Audio(song.u);
   a.loop = true;
-  a.volume = app.state.muted ? 0 : Math.max(0.3, app.state.volume || 0.5);
+  app._songEl = a;
+  applySongVolume(app);
   a.onerror = () => { app.toast("Nie udało się odtworzyć — użyj linku do YouTube albo bezpośredniego linku do pliku audio (.mp3/.m4a)", true); app.setState({ songPlaying: null }); _resumeBg(app); };
   const pr = a.play(); if (pr && pr.catch) pr.catch(() => app.toast("Kliknij ♪ Piosenka, aby odtworzyć", true));
-  app._songEl = a;
   app.setState({ songPlaying: nick, songYoutubeId: null });
 }
 function togglePlayerSong(app, nick) {
@@ -221,12 +235,13 @@ function renderYoutubeSongPlayer(app) {
   if (!app.state.songYoutubeId) return null;
   const t = app.theme();
   const id = app.state.songYoutubeId;
-  const src = "https://www.youtube.com/embed/" + id + "?autoplay=1&loop=1&playlist=" + id;
+  const src = "https://www.youtube.com/embed/" + id + "?autoplay=1&loop=1&playlist=" + id + "&enablejsapi=1";
+  // enablejsapi=1 + ref na <iframe> pozwala sterować głośnością tego konkretnego odtwarzacza przez postMessage (patrz applySongVolume) - bez tego link do YouTube grałby zawsze na swojej domyślnej głośności, niezależnie od suwaka/wyciszenia w apce.
   return h("div", { style: { position: "fixed", right: 16, bottom: 16, zIndex: 70, width: 300, borderRadius: 14, overflow: "hidden", border: "1px solid rgba(90,200,255,.4)", boxShadow: "0 14px 40px rgba(0,0,0,.6), 0 0 22px rgba(90,200,255,.25)", background: "#000" } },
     h("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 10px", background: "rgba(8,10,22,.92)" } },
       h("span", { style: { fontSize: 11.5, color: t.mut, fontWeight: 700, fontFamily: t.disp } }, "♪ Piosenka profilowa"),
       h("button", { onClick: () => _stopProfileSong(app), title: "Zatrzymaj", style: { cursor: "pointer", border: "none", background: "transparent", color: t.mut, fontSize: 14, lineHeight: 1 } }, "✕")),
-    h("iframe", { key: id, src, width: "300", height: "169", frameBorder: "0", allow: "autoplay; encrypted-media", title: "Piosenka profilowa (YouTube)", style: { display: "block" } }));
+    h("iframe", { key: id, src, width: "300", height: "169", frameBorder: "0", allow: "autoplay; encrypted-media", title: "Piosenka profilowa (YouTube)", style: { display: "block" }, ref: (el) => { app._songYtEl = el; }, onLoad: () => setTimeout(() => applySongVolume(app), 400) }));
 }
 
 window.BrowserViews.songEditor = renderSongEditorModal;
