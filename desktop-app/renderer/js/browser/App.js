@@ -24,10 +24,17 @@ class BrowserApp extends React.Component {
   componentDidMount() {
     this._onHash = () => this.readHash();
     window.addEventListener("hashchange", this._onHash);
+    // Pierwszy klik/dotyk/klawisz gdziekolwiek na stronie odcisza muzykę w tle, jeśli przeglądarka
+    // zablokowała jej autoplay ze dźwiękiem (patrz ensureBgAudioPlaying w Audio.js).
+    this._onFirstInteract = () => ensureBgAudioPlaying(this);
+    window.addEventListener("pointerdown", this._onFirstInteract, { once: true });
+    window.addEventListener("keydown", this._onFirstInteract, { once: true });
     this.init();
   }
   componentWillUnmount() {
     window.removeEventListener("hashchange", this._onHash);
+    window.removeEventListener("pointerdown", this._onFirstInteract);
+    window.removeEventListener("keydown", this._onFirstInteract);
     saveAudioPos(this);
   }
 

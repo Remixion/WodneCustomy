@@ -42,22 +42,28 @@ function saveAudioPos(app) {
 /**
  * Odtwarza muzykę w tle automatycznie po wejściu na stronę. Przeglądarki (w przeciwieństwie do
  * Electrona) blokują autoplay ze dźwiękiem bez wcześniejszej interakcji użytkownika ze stroną -
- * gdy tak się stanie, puszczamy ją od razu wyciszoną (na to zgoda jest zawsze) i zdejmujemy
- * wyciszenie przy pierwszym kliknięciu/klawiszu/dotyku, żeby dźwięk i tak włączył się bez
- * osobnego przycisku "kliknij, aby posłuchać".
+ * gdy się nie uda, i tak zostaje naprawione przy pierwszej interakcji (patrz ensureBgAudioPlaying
+ * poniżej, wywoływane z App.js na pointerdown/keydown na całym oknie).
  */
 function playBgAudio(app, el) {
   el.volume = app.state.volume;
   const pr = el.play();
-  if (pr && pr.catch) {
-    pr.catch(() => {
-      el.muted = true;
-      el.play().catch(() => {});
-      const unmute = () => { el.muted = false; };
-      window.addEventListener("pointerdown", unmute, { once: true });
-      window.addEventListener("keydown", unmute, { once: true });
-    });
-  }
+  if (pr && pr.catch) pr.catch(() => {});
+}
+
+/**
+ * Wywoływane przy PIERWSZEJ interakcji użytkownika ze stroną (patrz App.js componentDidMount -
+ * nasłuch na całym oknie, nie na samym przycisku, bo różne elementy mogą się w międzyczasie
+ * odmontować). Jeśli muzyka w tle powinna grać (niewyciszona w stanie apki), a z powodu polityki
+ * autoplay przeglądarki nie gra - naprawiamy to teraz, bo w odpowiedzi na gest użytkownika
+ * przeglądarki zawsze na to pozwalają, niezależnie od tego, czy wcześniejsza próba odtworzenia
+ * się powiodła, czy w ogóle się zdążyła wykonać.
+ */
+function ensureBgAudioPlaying(app) {
+  const el = app.audioRef.current;
+  if (!el || app.state.muted) return;
+  el.muted = false;
+  if (el.paused) { el.volume = app.state.volume; el.play().catch(() => {}); }
 }
 
 function playerSongs(app) {
