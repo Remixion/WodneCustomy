@@ -154,6 +154,7 @@
       role: POS_ROLE[String(mp.teamPosition || "").toUpperCase()] || "",
       champId, champKey: cinfo[0], champName: mp.championName || cinfo[1],
       nick, summoner: summoner || nick, tag: tag || "", puuid: mp.puuid || "", icon: (known && Number(known.profileIconId)) || 0,
+      songUrl: (known && known.songUrl) || "", monsterConfig: (known && known.monsterConfig) || "",
       spell1: Number(mp.spell1) || 0, spell2: Number(mp.spell2) || 0,
       keystone: Number(mp.keystone) || 0, primaryStyle: Number(mp.primaryRuneStyle) || 0, subStyle: Number(mp.subRuneStyle) || 0,
       level: Number(mp.champLevel) || 0,
@@ -237,10 +238,12 @@
       const key = norm(p.nick) || p.puuid || norm(p.summoner);
       const pl = players[key] || (players[key] = {
         key, nick: p.nick, summoner: p.summoner, tag: p.tag, puuid: p.puuid, icon: p.icon,
+        songUrl: p.songUrl || "", monsterConfig: p.monsterConfig || "",
         games: 0, wins: 0, sums: {}, roles: {}, champs: {}, matches: []
       });
       pl.games++; if (win) pl.wins++;
       pl.nick = p.nick || pl.nick; pl.summoner = p.summoner || pl.summoner; pl.icon = p.icon || pl.icon;
+      pl.songUrl = p.songUrl || pl.songUrl; pl.monsterConfig = p.monsterConfig || pl.monsterConfig;
       pl.roles[p.role] = (pl.roles[p.role] || 0) + 1;
       pl.champs[p.champId] = pl.champs[p.champId] || { champId: p.champId, champKey: p.champKey, champName: p.champName, games: 0, wins: 0, k: 0, d: 0, a: 0 };
       const pc = pl.champs[p.champId]; pc.games++; if (win) pc.wins++; pc.k += p.k; pc.d += p.d; pc.a += p.a;

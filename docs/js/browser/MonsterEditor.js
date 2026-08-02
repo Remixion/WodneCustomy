@@ -1,12 +1,32 @@
 /* Stworki-awatary (monsters.js) - port monsterInline/monsterImg/renderMonsterEditor/open-set-save-resetMonster z Match Browser.dc.html. monsters.js jest samodzielny (offline, bez zależności od naszych danych) i skopiowany bez zmian do js/monsters.js. */
 
+/**
+ * Konfiguracja stworka - preferuje wartość zapisaną w Arkuszu (Players.monsterConfig, patrz
+ * browserData.js buildPlayer/aggregate), bo ta jest widoczna wszędzie (desktop i GitHub Pages).
+ * Gdy jej brak (jeszcze niezapisana albo gracz bez rozpoznanego konta), spada do starego
+ * mechanizmu w monsters.js (lokalny override w localStorage tej przeglądarki, albo wyliczony
+ * domyślny/losowy z nicku) - żeby nic nie wyglądało "puste" zanim ktoś pierwszy raz zapisze.
+ */
+function resolveMonsterParams(app, nick) {
+  try {
+    const pl = findPlayerRecordByNick(app, nick);
+    if (pl && pl.monsterConfig) {
+      const parsed = JSON.parse(pl.monsterConfig);
+      if (parsed) return parsed;
+    }
+  } catch (e) {}
+  return window.Monsters.paramsFor(nick);
+}
+
 function monsterInline(app, nick, style) {
-  let svg = (window.Monsters && window.Monsters.svgFor) ? window.Monsters.svgFor(nick) : "";
+  const params = resolveMonsterParams(app, nick);
+  let svg = (window.Monsters && window.Monsters.buildSVG) ? window.Monsters.buildSVG(params) : "";
   svg = svg.replace('width="300" height="400"', 'width="100%" height="100%" preserveAspectRatio="xMidYMid slice" style="display:block"');
   return h("div", { dangerouslySetInnerHTML: { __html: svg }, style: Object.assign({ lineHeight: 0, width: "100%", height: "100%" }, style || {}) });
 }
 function monsterImg(app, nick, size) {
-  const uri = (window.Monsters && window.Monsters.svgUriFor) ? window.Monsters.svgUriFor(nick) : "";
+  const params = resolveMonsterParams(app, nick);
+  const uri = (window.Monsters && window.Monsters.uriOfParams) ? window.Monsters.uriOfParams(params) : "";
   return h("div", { style: { width: size, height: Math.round(size * 4 / 3), borderRadius: 10, overflow: "hidden", flex: "0 0 auto", background: "#0d0b16", boxShadow: "inset 0 0 0 1px rgba(255,255,255,.1)" } },
     uri ? h("img", { src: uri, alt: nick, loading: "lazy", decoding: "async", style: { width: "100%", height: "100%", objectFit: "cover", display: "block" } }) : null);
 }
@@ -32,12 +52,12 @@ function backgroundPaletteForRoute(app) {
   const id = app.state.route.id;
   const pl = players[id] || Object.values(players).find((x) => x.nick === id || x.puuid === id);
   if (!pl) return null;
-  const params = window.Monsters && window.Monsters.paramsFor ? window.Monsters.paramsFor(pl.nick || pl.summoner) : null;
+  const params = resolveMonsterParams(app, pl.nick || pl.summoner);
   return params ? paletteFromMonsterTheme(params.theme) : null;
 }
 
 function openMonsterEditor(app, nick) {
-  const params = JSON.parse(JSON.stringify(window.Monsters.paramsFor(nick)));
+  const params = JSON.parse(JSON.stringify(resolveMonsterParams(app, nick)));
   app.setState({ monsterEdit: { nick, params } });
 }
 function setMonsterParam(app, patch) {
@@ -51,9 +71,15 @@ function setMonsterSize(app, key, val) {
 }
 function saveMonster(app) {
   const me = app.state.monsterEdit; if (!me) return;
-  window.Monsters.setOverride(me.nick, me.params);
+  window.Monsters.setOverride(me.nick, me.params); // natychmiastowy lokalny podgląd, zanim wróci odświeżone z Arkusza
   app.setState({ monsterEdit: null });
-  app.toast("Zapisano stworka");
+  const pl = findPlayerRecordByNick(app, me.nick);
+  if (pl && pl.puuid && typeof window.api !== "undefined") {
+    window.api.store.updatePlayerField(pl.puuid, "monsterConfig", JSON.stringify(me.params)).then(() => app.reload());
+    app.toast("Zapisano stworka (wysłano do Arkusza)");
+  } else {
+    app.toast(typeof window.api === "undefined" ? "Zapisano stworka" : "Zapisano tylko lokalnie - nie znaleziono konta gracza w Arkuszu", typeof window.api !== "undefined");
+  }
 }
 function resetMonster(app) {
   const me = app.state.monsterEdit; if (!me) return;

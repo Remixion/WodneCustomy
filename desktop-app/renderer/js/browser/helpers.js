@@ -43,3 +43,11 @@ function bigStat(t, val, label, col) {
     h("div", { style: { fontFamily: t.disp, fontWeight: 700, fontSize: 26, color: col || t.text, fontVariantNumeric: "tabular-nums", textShadow: (col && col !== t.text) ? "0 0 14px " + col + "66" : "0 0 14px rgba(90,200,255,.3)" } }, val),
     h("div", { style: { fontSize: 11, color: t.faint, textTransform: "uppercase", letterSpacing: 1, marginTop: 2 } }, label));
 }
+
+/** Znajduje zagregowanego gracza (agg.players, patrz browserData.js) po nicku/summonerze - używane przez Audio.js (piosenka) i MonsterEditor.js (stworek), żeby dojść do puuid/songUrl/monsterConfig zapisanych w Arkuszu (zakładka Players). */
+function findPlayerRecordByNick(app, nick) {
+  if (!app.state.agg) return null;
+  const players = app.state.agg.players;
+  const k = window.LOLData.norm(nick);
+  return players[k] || Object.values(players).find((p) => (p.nick || p.summoner) === nick) || null;
+}

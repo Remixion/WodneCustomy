@@ -1,6 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 
+/** teamPosition -> sufiks nazwy kolumny (blueTopPlayer, redJunglePlayer, ...). */
+const ROLE_COLUMN_SUFFIX = { TOP: 'Top', JUNGLE: 'Jungle', MIDDLE: 'Middle', BOTTOM: 'Bottom', SUPPORT: 'Support' };
+
 function safeParseJson(str, fallback) {
   if (!str) return fallback;
   try {
@@ -35,23 +38,26 @@ class LocalStore {
   }
 
   saveMatch(match, players) {
-    match.bluePlayerNames = this.resolvePlayerNamesSummaryForSide(players, 'BLUE');
-    match.redPlayerNames = this.resolvePlayerNamesSummaryForSide(players, 'RED');
+    Object.assign(match, this.buildPlayerColumnsByRole(players));
     const file = path.join(this.matchesDir, `${match.matchId}.json`);
     fs.writeFileSync(file, JSON.stringify({ match, players }, null, 2), 'utf8');
   }
 
   /**
-   * Buduje listę nicków (nie prawdziwych kont Riot) do szybkiego podglądu w
-   * Arkuszu, osobno dla każdej strony - preferuje `nick` przypisany graczowi w
-   * podarkuszu Players (np. "Resek"), a dopiero gdy go brak, zwraca surowe
-   * summonerName z tego meczu (np. "Cytrysia#UwU"), tak samo jak robi to
-   * getPlayerDisplayName w UI. Mecze z arkusza ligi (bez znanej realnej strony
-   * Blue/Red) mają team="LEFT"/"RIGHT" - traktujemy LEFT jak BLUE i RIGHT jak
-   * RED wyłącznie na potrzeby tego wygodnego podziału kolumn, bez zmiany
-   * samego pola team/winningTeam.
+   * Buduje { blueTopPlayer: 'Nick', blueJunglePlayer: 'Nick2', ... } - po
+   * jednej kolumnie na rolę na stronę, do szybkiego podglądu w arkuszu -
+   * najlepszy dostępny LOKALNIE nick (preferuje `nick` przypisany graczowi w
+   * podarkuszu Players, np. "Resek", a dopiero gdy go brak, surowe
+   * summonerName z tego meczu, np. "Cytrysia#UwU", tak samo jak robi to
+   * getPlayerDisplayName w UI). To tylko wartość startowa/podglądowa -
+   * Code.gs po stronie serwera i tak nadpisuje te kolumny AKTUALNĄ
+   * zawartością Players przy każdej synchronizacji, więc ręczna zmiana nicku
+   * w Arkuszu nie zależy od tego, czy lokalny cache apki zdążył się odświeżyć.
+   * Mecze z arkusza ligi (bez znanej realnej strony Blue/Red) mają
+   * team="LEFT"/"RIGHT" - traktowane jak BLUE/RED wyłącznie na potrzeby tego
+   * podziału kolumn, bez zmiany samego pola team/winningTeam.
    */
-  resolvePlayerNamesSummaryForSide(players, side) {
+  buildPlayerColumnsByRole(players) {
     const allPlayers = this.listPlayers();
     const byPuuid = {};
     allPlayers.forEach((p) => {
@@ -59,15 +65,26 @@ class LocalStore {
     });
     const isBlueLike = (team) => team === 'BLUE' || team === 'LEFT';
     const isRedLike = (team) => team === 'RED' || team === 'RIGHT';
-    const matchesSide = side === 'BLUE' ? isBlueLike : isRedLike;
-    return (players || [])
-      .filter((p) => matchesSide(p.team))
-      .map((p) => {
-        const known = p.puuid && byPuuid[p.puuid];
-        return (known && known.nick) || p.summonerName || '';
-      })
-      .filter(Boolean)
-      .join(', ');
+    // Zawsze wszystkie 10 kluczy (domyślnie '') - patrz komentarz przy
+    // buildChampionColumnsByRole w matchBuilder.js o tym, czemu brakująca
+    // (a nie pusta) kolumna jest niebezpieczna przy zapisie do Arkusza.
+    const result = {};
+    ['blue', 'red'].forEach((side) => {
+      Object.values(ROLE_COLUMN_SUFFIX).forEach((suffix) => {
+        result[`${side}${suffix}Player`] = '';
+      });
+    });
+    (players || []).forEach((p) => {
+      const suffix = ROLE_COLUMN_SUFFIX[p.teamPosition];
+      if (!suffix) return;
+      const side = isBlueLike(p.team) ? 'blue' : isRedLike(p.team) ? 'red' : null;
+      if (!side) return;
+      const known = p.puuid && byPuuid[p.puuid];
+      const name = (known && known.nick) || p.summonerName || '';
+      if (!name) return;
+      result[`${side}${suffix}Player`] = name;
+    });
+    return result;
   }
 
   /**

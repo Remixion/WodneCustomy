@@ -11,6 +11,7 @@ const { parseLeagueSheetFile } = require('./src/collector/leagueSheetParser');
 const { enrichPlayer } = require('./src/collector/playerProfile');
 const { LocalStore } = require('./src/storage/localStore');
 const { ConfigStore } = require('./src/config/configStore');
+const { ScanFoundStore } = require('./src/storage/scanFoundStore');
 const { postToAppsScript, getFromAppsScript } = require('./src/sync/sheetsClient');
 const { connectDiscordRpc, buildDiscordAvatarUrl } = require('./src/discord/discordRpc');
 const { fetchAllGuildMembers, buildDiscordMemberLookup } = require('./src/discord/discordBot');
@@ -21,6 +22,7 @@ const { LcuClient } = require('./src/lcu/client');
 let mainWindow;
 let configStore;
 let store;
+let scanFoundStore;
 let watcher;
 
 function createWindow() {
@@ -132,6 +134,7 @@ app.whenReady().then(() => {
   configStore = new ConfigStore(path.join(userDataPath, 'config.json'), path.join(userDataPath, 'data'));
   const cfg = configStore.getAll();
   store = new LocalStore(cfg.dataDir || path.join(userDataPath, 'data'));
+  scanFoundStore = new ScanFoundStore(path.join(userDataPath, 'scanFoundGames.json'));
 
   createWindow();
   startWatcher();
@@ -166,7 +169,25 @@ ipcMain.handle('store:update-match-player-field', (_evt, { matchId, puuid, field
 );
 ipcMain.handle('store:delete-match', (_evt, matchId) => store.deleteMatch(matchId));
 ipcMain.handle('store:list-players', () => store.listPlayers());
-ipcMain.handle('store:update-player-field', (_evt, { puuid, field, value }) => store.updatePlayerField(puuid, field, value));
+/**
+ * songUrl/monsterConfig (piosenka profilowa / konfiguracja stworka - ustawiane z Przeglądarki
+ * meczy) dodatkowo od razu wysyłamy do Arkusza po każdej zmianie, żeby nie trzeba było ręcznie
+ * klikać "Wyślij wszystkich graczy do Google Sheets" za każdym razem - to jedyne pola z tym
+ * automatycznym zachowaniem (inne, jak nick/color, nadal wymagają ręcznego push jak dotychczas).
+ */
+ipcMain.handle('store:update-player-field', async (_evt, { puuid, field, value }) => {
+  const ok = store.updatePlayerField(puuid, field, value);
+  if (ok && (field === 'songUrl' || field === 'monsterConfig')) {
+    const cfg = configStore.getAll();
+    if (cfg.appsScriptUrl) {
+      const player = store.listPlayers().find((p) => p.puuid === puuid);
+      if (player) {
+        try { await syncPlayersToSheets([player]); } catch (err) { /* lokalny zapis już się udał - brak połączenia z Arkuszem nie powinien zgłosić błędu całej operacji */ }
+      }
+    }
+  }
+  return ok;
+});
 ipcMain.handle('store:delete-player', (_evt, puuid) => store.deletePlayer(puuid));
 ipcMain.handle('store:add-player', async (_evt, { nick, color, summonerName }) => {
   try {
@@ -424,7 +445,99 @@ ipcMain.handle('history:import-match', async (_evt, gameId) => {
     const previousEogStatsBlock = getPreviousEogStatsBlock(gameId);
     const { match, players } = await buildMatchFromGameId(client, gameId, { includeEogStatsBlock: false, previousEogStatsBlock });
     const result = await processCollectedMatch(client, { match, players });
+    scanFoundStore.remove(gameId);
     return { ok: true, matchId: result.match.matchId, enrichedCount: result.enrichedCount, syncResult: result.syncResult };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+});
+
+/**
+ * Znormalizowany nick do porównania gracza między legacy i LCU - nie po
+ * puuid, bo mecze z arkusza ligi mają syntetyczne puuid "nick:<nick>", inne
+ * niż prawdziwe puuid z LCU dla tej samej osoby. Preferuje nick przypisany w
+ * podarkuszu Players (jeśli dany puuid jest tam znany), inaczej surowe
+ * summonerName z obciętym tagline.
+ */
+function resolveComparableNick(player, playersByPuuid) {
+  const known = player.puuid && playersByPuuid[player.puuid];
+  if (known && known.nick) return known.nick.trim().toLowerCase();
+  return String(player.summonerName || '').split('#')[0].trim().toLowerCase();
+}
+
+/**
+ * Łączy stary mecz "legacy" (zaimportowany bez znanego prawdziwego Game ID -
+ * z arkusza ligi albo starego pliku JSON, matchId typu "legacy-...") z
+ * prawdziwym Game ID znalezionym przez skaner/historię klienta - ten sam
+ * realny mecz nie ma wtedy zostać zduplikowany jako dwa osobne wiersze.
+ * Importuje pełne dane pod prawdziwym ID (tak jak normalny import), przenosi
+ * notatki ze starego wpisu (jeśli nowy ich nie ma), a stary wpis usuwa
+ * lokalnie i w Arkuszu. Inne ręczne poprawki na starym wpisie (np. w
+ * pojedynczych statystykach) nie są przenoszone - świeży import z pełnymi
+ * danymi z klienta jest traktowany jako źródło prawdy, Z WYJĄTKIEM roli
+ * (teamPosition): wykrywanie roli z LCU bywa błędne (duplikaty/brakujące
+ * role), więc przy niezgodności z rolą zapisaną w legacy wygrywa legacy - a
+ * każda taka niezgodność wraca jako ostrzeżenie do ręcznej weryfikacji.
+ */
+ipcMain.handle('history:merge-with-legacy', async (_evt, { gameId, legacyMatchId }) => {
+  try {
+    const client = createOneOffLcuClient();
+    if (!client) return { ok: false, error: 'Klient League of Legends nie jest uruchomiony.' };
+    const legacy = store.getMatch(legacyMatchId);
+    if (!legacy) return { ok: false, error: `Nie znaleziono lokalnie meczu legacy ${legacyMatchId}.` };
+
+    const previousEogStatsBlock = getPreviousEogStatsBlock(gameId);
+    const { match, players } = await buildMatchFromGameId(client, gameId, { includeEogStatsBlock: false, previousEogStatsBlock });
+    if (!match.notes && legacy.match.notes) match.notes = legacy.match.notes;
+
+    const playersByPuuid = {};
+    store.listPlayers().forEach((p) => {
+      if (p.puuid) playersByPuuid[p.puuid] = p;
+    });
+    const legacyByNick = {};
+    (legacy.players || []).forEach((p) => {
+      legacyByNick[resolveComparableNick(p, playersByPuuid)] = p;
+    });
+
+    const roleWarnings = [];
+    players.forEach((p) => {
+      const nick = resolveComparableNick(p, playersByPuuid);
+      const legacyPlayer = legacyByNick[nick];
+      if (!legacyPlayer || !legacyPlayer.teamPosition || legacyPlayer.teamPosition === p.teamPosition) return;
+      roleWarnings.push(`${nick}: legacy=${legacyPlayer.teamPosition}, LCU=${p.teamPosition || '?'} - przyjęto legacy`);
+      p.teamPosition = legacyPlayer.teamPosition;
+    });
+
+    const result = await processCollectedMatch(client, { match, players });
+    scanFoundStore.remove(gameId);
+
+    store.deleteMatch(legacyMatchId);
+    const cfg = configStore.getAll();
+    let deleteResult = null;
+    if (cfg.appsScriptUrl) {
+      deleteResult = await postToAppsScript(cfg.appsScriptUrl, cfg.sharedSecret, 'deleteMatch', { matchId: legacyMatchId });
+    }
+
+    // Usunięcie starego wpisu mogło znowu przesunąć chronologiczną numerację gid.
+    const gidChanges = store.recomputeAllGids();
+    if (cfg.appsScriptUrl) {
+      for (const change of gidChanges) {
+        await postToAppsScript(cfg.appsScriptUrl, cfg.sharedSecret, 'updateMatchField', {
+          matchId: change.matchId,
+          field: 'gid',
+          value: change.gid,
+        });
+      }
+    }
+
+    return {
+      ok: true,
+      matchId: result.match.matchId,
+      deletedLegacyId: legacyMatchId,
+      deleteResult,
+      enrichedCount: result.enrichedCount,
+      roleWarnings,
+    };
   } catch (err) {
     return { ok: false, error: String(err) };
   }
@@ -469,6 +582,7 @@ ipcMain.handle('scanner:start', async (_evt, { startId, endId, requestsPerSecond
     shouldStop: () => scanSession.stopRequested,
     onProgress: (p) => {
       configStore.setAll({ scanLastId: p.lastId });
+      scanFoundStore.add(p.newlyFound);
       sendToRenderer('scanner:progress', {
         checked: p.checked,
         errors: p.errors,
@@ -505,6 +619,13 @@ ipcMain.handle('scanner:get-saved-progress', () => {
     scanRequestsPerSecond: cfg.scanRequestsPerSecond,
     running: !!(scanSession && scanSession.running),
   };
+});
+
+/** Znalezione przez skaner, ale jeszcze niezaimportowane mecze, zapisane trwale w scanFoundGames.json - przetrwają restart/awarię zasilania między znalezieniem a importem. */
+ipcMain.handle('scanner:list-saved-found', () => {
+  const existingIds = new Set(store.listMatches().map((m) => String(m.match.matchId)));
+  const saved = scanFoundStore.list().filter((g) => !existingIds.has(String(g.gameId)));
+  return saved.map((g) => ({ ...g, alreadyImported: false }));
 });
 
 // ---- IPC: import z plików .rofl (patrz komentarz w roflParser.js o ograniczeniach) ----
@@ -643,8 +764,6 @@ ipcMain.handle('rofl:import', async (_evt, filePaths) => {
         winningTeam: '',
         blueBans: '',
         redBans: '',
-        blueChampions: '',
-        redChampions: '',
         blueBaronKills: 0,
         blueDragonKills: 0,
         blueHeraldKills: 0,

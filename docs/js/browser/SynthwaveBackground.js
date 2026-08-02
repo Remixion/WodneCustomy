@@ -58,6 +58,18 @@ class SynthwaveBackground extends React.Component {
     const glowRgb = synthbgHexToRgb(pal.glow), gridRgb = synthbgHexToRgb(pal.grid);
     const starRgb = synthbgHexToRgb(pal.star), particleRgb = synthbgHexToRgb(pal.particle);
     const horizonGlowRgb = synthbgHexToRgb(pal.horizonGlow);
+    // Tło "pulsuje" w rytm muzyki w tle - patrz readBgAudioLevels w Audio.js. {level:0,bass:0}
+    // (czyli brak efektu) dopóki analizator nie jest jeszcze podpięty (przed pierwszą interakcją
+    // ze stroną - patrz komentarz przy setupBgAnalyser), więc siatka nigdy nie wygląda "zepsuta"
+    // w tym okresie, tylko statycznie jak wcześniej. Surowe wartości z FFT skaczą klatka po
+    // klatce nawet z wygładzaniem samego analizatora (smoothingTimeConstant) - tu dodatkowo
+    // "ease'ujemy" je do płynnego pulsu (wykładnicza średnia krocząca), zamiast szarpać rozmiarem
+    // słońca/siatki bezpośrednio surowym sygnałem.
+    const rawLevels = (this.props.audioApp && typeof readBgAudioLevels === "function") ? readBgAudioLevels(this.props.audioApp) : { level: 0, bass: 0 };
+    if (this._smoothLevel == null) { this._smoothLevel = 0; this._smoothBass = 0; }
+    this._smoothLevel += (rawLevels.level - this._smoothLevel) * 0.06;
+    this._smoothBass += (rawLevels.bass - this._smoothBass) * 0.06;
+    const levels = { level: this._smoothLevel, bass: this._smoothBass };
     const ctx = b.ctx, w = b.w, h = b.h;
     const horizon = h * 0.40;
     ctx.setTransform(b.dpr, 0, 0, b.dpr, 0, 0);
@@ -66,7 +78,7 @@ class SynthwaveBackground extends React.Component {
     sky.addColorStop(0, pal.skyTop); sky.addColorStop(.55, pal.skyMid); sky.addColorStop(1, pal.skyBottom);
     ctx.fillStyle = sky; ctx.fillRect(0, 0, w, horizon);
     for (let i = 0; i < 60; i++) { const sx = (this.noise(i, 7) * .5 + .5) * w, sy = (this.noise(i, 3) * .5 + .5) * horizon * .8; const a = .18 + .35 * Math.abs(Math.sin(t * 1.5 + i)); ctx.fillStyle = "rgba(" + starRgb + "," + a.toFixed(2) + ")"; ctx.fillRect(sx, sy, 1.3, 1.3); }
-    const cx = w * 0.5, cy = horizon, rad = Math.min(w * 0.14, horizon * 0.72);
+    const cx = w * 0.5, cy = horizon, rad = Math.min(w * 0.14, horizon * 0.72) * (1 + levels.bass * 0.07);
     ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, rad, Math.PI, 2 * Math.PI); ctx.closePath(); ctx.clip();
     const sun = ctx.createLinearGradient(0, cy - rad, 0, cy);
     sun.addColorStop(0, pal.sunTop); sun.addColorStop(.5, pal.sunMid); sun.addColorStop(1, pal.sunBottom);
@@ -76,7 +88,7 @@ class SynthwaveBackground extends React.Component {
     ctx.restore();
     ctx.globalCompositeOperation = "lighter";
     const gg = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad * 2);
-    gg.addColorStop(0, "rgba(" + glowRgb + ",.3)"); gg.addColorStop(1, "rgba(" + glowRgb + ",0)");
+    gg.addColorStop(0, "rgba(" + glowRgb + "," + Math.min(0.95, 0.3 + levels.level * 0.7).toFixed(2) + ")"); gg.addColorStop(1, "rgba(" + glowRgb + ",0)");
     ctx.fillStyle = gg; ctx.beginPath(); ctx.arc(cx, cy, rad * 2, 0, 6.283); ctx.fill();
     ctx.globalCompositeOperation = "source-over";
     const sea = ctx.createLinearGradient(0, horizon, 0, h);
@@ -84,13 +96,14 @@ class SynthwaveBackground extends React.Component {
     ctx.fillStyle = sea; ctx.fillRect(0, horizon, w, h - horizon);
     ctx.globalCompositeOperation = "lighter";
     const hg = ctx.createLinearGradient(0, horizon - 8, 0, horizon + 8);
-    hg.addColorStop(0, "rgba(" + glowRgb + ",0)"); hg.addColorStop(.5, "rgba(" + horizonGlowRgb + ",.55)"); hg.addColorStop(1, "rgba(" + glowRgb + ",0)");
+    hg.addColorStop(0, "rgba(" + glowRgb + ",0)"); hg.addColorStop(.5, "rgba(" + horizonGlowRgb + "," + Math.min(1, 0.55 + levels.level * 0.5).toFixed(2) + ")"); hg.addColorStop(1, "rgba(" + glowRgb + ",0)");
     ctx.fillStyle = hg; ctx.fillRect(0, horizon - 8, w, 16);
     ctx.globalCompositeOperation = "source-over";
-    ctx.strokeStyle = "rgba(" + gridRgb + ",.45)"; ctx.shadowColor = "rgba(" + gridRgb + ",.7)"; ctx.shadowBlur = 6;
+    ctx.strokeStyle = "rgba(" + gridRgb + ",.45)"; ctx.shadowColor = "rgba(" + gridRgb + ",.7)"; ctx.shadowBlur = 6 + levels.bass * 26;
     ctx.save();
     const T = 13;
     const rows = 26;
+    const gridPulse = 1 + levels.bass * 1.3;
     for (let i = 0; i < rows; i++) {
       // Dawniej cała siatka zoomowała się wspólnie i co T sekund twardo wracała do startu (stąd
       // przygaszanie, żeby zamaskować skok). Teraz każdy rząd ma własną, przesuniętą w fazie
@@ -99,7 +112,7 @@ class SynthwaveBackground extends React.Component {
       // niezauważalne - żadnego globalnego przeskoku ani przygaszania całej siatki.
       const p = ((i / rows) + (t / T)) % 1;
       const y = horizon + Math.pow(p, 1.9) * (h - horizon), amp = 1 + p * p * 12;
-      ctx.lineWidth = 0.6 + p * 1.6; ctx.globalAlpha = 0.2 + p * 0.5;
+      ctx.lineWidth = 0.6 + p * 1.6; ctx.globalAlpha = Math.min(1, (0.2 + p * 0.5) * gridPulse);
       ctx.beginPath();
       for (let x = 0; x <= w; x += 8) { const yv = y + Math.sin(x * 0.02 + t * (0.6 + p) + i) * amp * 0.6; x === 0 ? ctx.moveTo(x, yv) : ctx.lineTo(x, yv); }
       ctx.stroke();
@@ -109,7 +122,7 @@ class SynthwaveBackground extends React.Component {
       const fx = cx + (i / cols) * w * 1.3;
       // Boczne linie zbiegające do słońca nie "jeżdżą" w głąb jak rzędy - stoją w miejscu, tylko
       // subtelnie pulsują jasnością (czysto kosmetyczne, funkcja sinus - z natury bez przeskoków).
-      ctx.globalAlpha = (0.10 + 0.22 * (1 - Math.abs(i) / cols)) + Math.sin(t * 0.4 + i * 0.3) * 0.04;
+      ctx.globalAlpha = Math.min(1, ((0.10 + 0.22 * (1 - Math.abs(i) / cols)) + Math.sin(t * 0.4 + i * 0.3) * 0.04) * gridPulse);
       ctx.lineWidth = 0.6 + (1 - Math.abs(i) / cols) * 1.2;
       ctx.beginPath(); ctx.moveTo(cx, horizon); ctx.lineTo(fx, h); ctx.stroke();
     }

@@ -1,5 +1,5 @@
 const fs = require('fs');
-const { mapIdToShortName, summarizeListForSide } = require('./matchBuilder');
+const { mapIdToShortName, buildChampionColumnsByRole } = require('./matchBuilder');
 
 /**
  * Import ręcznie prowadzonego arkusza ligi sprzed tej apki (kolumny: GID,
@@ -170,8 +170,7 @@ function buildMatchFromLeagueSheetRow(row) {
     };
   }).filter(Boolean);
 
-  match.blueChampions = summarizeListForSide(players, 'BLUE', 'championName');
-  match.redChampions = summarizeListForSide(players, 'RED', 'championName');
+  Object.assign(match, buildChampionColumnsByRole(players));
 
   return { match, players };
 }

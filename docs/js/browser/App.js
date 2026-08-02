@@ -103,13 +103,14 @@ class BrowserApp extends React.Component {
   renderApp() {
     if (!this.state.ready) return this.renderLoading();
     return h("div", { className: "lolscroll", style: { display: "flex", flexDirection: "column", minHeight: "100vh", background: "transparent", position: "relative" } },
-      h(SynthwaveBackground, { palette: backgroundPaletteForRoute(this) }),
+      h(SynthwaveBackground, { palette: backgroundPaletteForRoute(this), audioApp: this }),
       h("audio", { ref: this.audioRef, src: "assets/neon-waterfall.mp3", loop: true, preload: "auto", onTimeUpdate: () => { if (!this._savedT || Date.now() - this._savedT > 4000) { this._savedT = Date.now(); saveAudioPos(this); } }, onLoadedMetadata: (e) => { try { const p = parseFloat(localStorage.getItem("wcAudioPos") || "0"); if (p && p < e.target.duration) e.target.currentTime = p; } catch (er) {} if (!this.state.muted) playBgAudio(this, e.target); }, style: { display: "none" } }),
       this.renderSidebar(),
       h("main", { className: "lolscroll", style: { flex: 1, minWidth: 0, position: "relative", zIndex: 1 } }, this.renderView()),
       this.state.playerModal && window.BrowserViews.playerModal ? window.BrowserViews.playerModal(this) : null,
       this.state.monsterEdit && window.BrowserViews.monsterEditor ? window.BrowserViews.monsterEditor(this) : null,
       this.state.songEdit && window.BrowserViews.songEditor ? window.BrowserViews.songEditor(this) : null,
+      renderYoutubeSongPlayer(this),
       this.state.toast ? this.renderToast() : null
     );
   }

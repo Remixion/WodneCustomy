@@ -69,11 +69,21 @@ var MATCH_PLAYERS_HEADERS = [
   'win', 'notes', 'updatedAt'
 ];
 
+/**
+ * songUrl/monsterConfig dodane NA KOŃCU (2026-08) - piosenka profilowa (link YouTube albo
+ * bezpośredni plik audio) i konfiguracja stworka (JSON z Przeglądarki meczy) z localStorage
+ * przenoszą się tutaj, żeby były widoczne wszędzie (w tym na GitHub Pages, gdzie localStorage
+ * jest osobny dla każdego odwiedzającego) bez ręcznego eksportu/importu pliku. Dopisanie na
+ * KOŃCU listy jest bezpieczne (patrz komentarz przy MATCHES_HEADERS wyżej o migracjach) - nie
+ * przesuwa indeksu klucza (puuid, wciąż pierwszy), więc nie wymaga przepisywania istniejących
+ * wierszy.
+ */
 var PLAYERS_HEADERS = [
   'puuid', 'nick', 'color', 'avatarSource', 'discordNick',
   'discordUserId', 'discordAvatarHash', 'discordAvatarUrl',
   'summonerName', 'summonerId', 'accountId', 'profileIconId', 'summonerLevel',
-  'soloTier', 'soloRank', 'soloLP', 'soloWins', 'soloLosses'
+  'soloTier', 'soloRank', 'soloLP', 'soloWins', 'soloLosses',
+  'songUrl', 'monsterConfig'
 ];
 
 /**

@@ -40,26 +40,41 @@ function mapIdToShortName(mapId) {
   return MAP_SHORT_NAMES[Number(mapId)] || `#${mapId}`;
 }
 
-/** Buduje jedną, czytelną listę (rozdzielaną przecinkami) z pola graczy - do szybkiego podglądu w arkuszu. */
-function summarizeList(players, field) {
-  return players
-    .map((p) => p[field])
-    .filter(Boolean)
-    .join(', ');
-}
+/** teamPosition -> sufiks nazwy kolumny (blueTopChampion, redJungleChampion, ...). */
+const ROLE_COLUMN_SUFFIX = { TOP: 'Top', JUNGLE: 'Jungle', MIDDLE: 'Middle', BOTTOM: 'Bottom', SUPPORT: 'Support' };
 
 /**
- * Jak summarizeList, ale tylko dla graczy jednej strony - do podziału kolumn
- * blueChampions/redChampions w Arkuszu. Mecze z arkusza ligi (bez znanej
- * realnej strony Blue/Red) mają team="LEFT"/"RIGHT" - traktujemy LEFT jak
- * BLUE i RIGHT jak RED wyłącznie na potrzeby tego wygodnego podziału, bez
- * zmiany samego pola team/winningTeam.
+ * Buduje { blueTopChampion: 'Camille', blueJungleChampion: 'Vi', ... } - po
+ * jednej kolumnie na rolę na stronę, do szybkiego podglądu w arkuszu bez
+ * zaglądania do MatchPlayers. Mecze z arkusza ligi (bez znanej realnej strony
+ * Blue/Red) mają team="LEFT"/"RIGHT" - traktowane jak BLUE/RED wyłącznie na
+ * potrzeby tego podziału kolumn, bez zmiany samego pola team/winningTeam.
+ * Gracz bez rozpoznanej roli (teamPosition poza standardowymi pięcioma) nie
+ * trafia do żadnej kolumny - nie ma dokąd go przypisać.
  */
-function summarizeListForSide(players, side, field) {
+function buildChampionColumnsByRole(players) {
   const isBlueLike = (team) => team === 'BLUE' || team === 'LEFT';
   const isRedLike = (team) => team === 'RED' || team === 'RIGHT';
-  const matchesSide = side === 'BLUE' ? isBlueLike : isRedLike;
-  return summarizeList(players.filter((p) => matchesSide(p.team)), field);
+  // Zawsze wszystkie 10 kluczy (domyślnie '') - nie tylko dla ról faktycznie
+  // znalezionych. Rzadki, ale realny przypadek błędnego wykrycia roli (dwóch
+  // graczy na tej samej roli, żaden na innej) inaczej zostawiałby brakującą
+  // kolumnę bez wartości w ogóle - a to w Arkuszu (przez upsertRow_, który
+  // pola nieobecne w wysłanym obiekcie zostawia bez zmian) ujawniałoby się
+  // jako przypadkowa stara wartość z innej kolumny, nie pusta komórka.
+  const result = {};
+  ['blue', 'red'].forEach((side) => {
+    Object.values(ROLE_COLUMN_SUFFIX).forEach((suffix) => {
+      result[`${side}${suffix}Champion`] = '';
+    });
+  });
+  players.forEach((p) => {
+    const suffix = ROLE_COLUMN_SUFFIX[p.teamPosition];
+    if (!suffix || !p.championName) return;
+    const side = isBlueLike(p.team) ? 'blue' : isRedLike(p.team) ? 'red' : null;
+    if (!side) return;
+    result[`${side}${suffix}Champion`] = p.championName;
+  });
+  return result;
 }
 
 /**
@@ -149,6 +164,17 @@ async function buildMatchFromGameId(
   { includeEogStatsBlock = false, previousEogStatsBlock = null, dataSource = 'lcu-history' } = {}
 ) {
   const matchHistory = await client.get(`/lol-match-history/v1/games/${gameId}`);
+
+  // Ten tracker jest wyłącznie dla customowych gier 5v5 - Rankingowe (i inne
+  // kolejki) nigdy nie powinny trafić do systemu, nawet jeśli klient akurat
+  // wyśle zdarzenie końca gry podczas gdy apka nasłuchuje (żywe
+  // przechwytywanie) albo ktoś ręcznie zaimportuje je z historii klienta.
+  const isCustomGame = matchHistory.gameType === 'CUSTOM_GAME' || matchHistory.queueId === 0;
+  if (!isCustomGame) {
+    throw new Error(
+      `Mecz ${gameId} nie jest grą customową (gameType: ${matchHistory.gameType || '?'}, queueId: ${matchHistory.queueId}) - pominięto.`
+    );
+  }
 
   let eogStatsBlock = null;
   if (includeEogStatsBlock) {
@@ -286,8 +312,7 @@ async function buildMatchFromGameId(
 
   resolveDuplicateJungles(players);
 
-  match.blueChampions = summarizeListForSide(players, 'BLUE', 'championName');
-  match.redChampions = summarizeListForSide(players, 'RED', 'championName');
+  Object.assign(match, buildChampionColumnsByRole(players));
 
   return { match, players };
 }
@@ -314,6 +339,5 @@ module.exports = {
   resolveDuplicateJungles,
   toPatchVersion,
   mapIdToShortName,
-  summarizeList,
-  summarizeListForSide,
+  buildChampionColumnsByRole,
 };

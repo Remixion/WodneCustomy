@@ -6,7 +6,7 @@ const {
   resolveDuplicateJungles,
   toPatchVersion,
   mapIdToShortName,
-  summarizeListForSide,
+  buildChampionColumnsByRole,
 } = require('./matchBuilder');
 
 function teamLabel(teamId) {
@@ -311,8 +311,7 @@ function buildMatchFromLegacyJson(raw, { gameId, previousEogStatsBlock = null, d
 
   resolveDuplicateJungles(players);
 
-  match.blueChampions = summarizeListForSide(players, 'BLUE', 'championName');
-  match.redChampions = summarizeListForSide(players, 'RED', 'championName');
+  Object.assign(match, buildChampionColumnsByRole(players));
 
   return { match, players };
 }

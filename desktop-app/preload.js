@@ -39,11 +39,13 @@ contextBridge.exposeInMainWorld('api', {
     listMatchesSince: (sinceDateIso) => ipcRenderer.invoke('history:list-matches-since', sinceDateIso),
     lookupGame: (gameId) => ipcRenderer.invoke('history:lookup-game', gameId),
     importMatch: (gameId) => ipcRenderer.invoke('history:import-match', gameId),
+    mergeWithLegacy: (gameId, legacyMatchId) => ipcRenderer.invoke('history:merge-with-legacy', { gameId, legacyMatchId }),
   },
   scanner: {
     start: (params) => ipcRenderer.invoke('scanner:start', params),
     stop: () => ipcRenderer.invoke('scanner:stop'),
     getSavedProgress: () => ipcRenderer.invoke('scanner:get-saved-progress'),
+    listSavedFound: () => ipcRenderer.invoke('scanner:list-saved-found'),
     onProgress: (cb) => ipcRenderer.on('scanner:progress', (_evt, data) => cb(data)),
     onDone: (cb) => ipcRenderer.on('scanner:done', (_evt, data) => cb(data)),
   },

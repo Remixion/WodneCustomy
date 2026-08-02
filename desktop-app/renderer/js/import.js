@@ -922,8 +922,16 @@ document.getElementById('monster-import-file').addEventListener('change', async 
     const data = JSON.parse(text);
     if (!data.nick || !data.params) throw new Error('nieprawidłowy plik - brak pól "nick"/"params"');
     window.Monsters.setOverride(data.nick, data.params);
-    resultEl.textContent = `Zaimportowano stworka dla "${data.nick}".`;
-    logEvent(`Zaimportowano stworka z pliku dla gracza ${data.nick}`);
+    const players = await window.api.store.listPlayers();
+    const player = players.find((p) => (p.nick || '').trim().toLowerCase() === String(data.nick).trim().toLowerCase());
+    if (player && player.puuid) {
+      await window.api.store.updatePlayerField(player.puuid, 'monsterConfig', JSON.stringify(data.params));
+      resultEl.textContent = `Zaimportowano stworka dla "${data.nick}" i wysłano do Arkusza.`;
+      logEvent(`Zaimportowano stworka z pliku dla gracza ${data.nick} (wysłano do Arkusza)`);
+    } else {
+      resultEl.textContent = `Zaimportowano stworka dla "${data.nick}" (tylko lokalnie - nie znaleziono gracza o tym nicku w zakładce Gracze).`;
+      logEvent(`Zaimportowano stworka z pliku dla gracza ${data.nick} (tylko lokalnie)`);
+    }
   } catch (err) {
     resultEl.textContent = `Błąd importu: ${err.message}`;
     logEvent(`Błąd importu stworka: ${err.message}`);
