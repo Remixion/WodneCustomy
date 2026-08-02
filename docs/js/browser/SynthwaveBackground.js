@@ -99,7 +99,14 @@ class SynthwaveBackground extends React.Component {
     hg.addColorStop(0, "rgba(" + glowRgb + ",0)"); hg.addColorStop(.5, "rgba(" + horizonGlowRgb + "," + Math.min(1, 0.55 + levels.level * 0.5).toFixed(2) + ")"); hg.addColorStop(1, "rgba(" + glowRgb + ",0)");
     ctx.fillStyle = hg; ctx.fillRect(0, horizon - 8, w, 16);
     ctx.globalCompositeOperation = "source-over";
-    ctx.strokeStyle = "rgba(" + gridRgb + ",.45)"; ctx.shadowColor = "rgba(" + gridRgb + ",.7)"; ctx.shadowBlur = 6 + levels.bass * 26;
+    ctx.strokeStyle = "rgba(" + gridRgb + ",.45)";
+    // Poświatę siatki dawniej dawał ctx.shadowBlur (promień zależny od basu, więc zmieniający się
+    // co klatkę) - canvas shadowBlur jest dramatycznie wolniejszy na Firefoksie niż na Chrome
+    // (brak tych samych skrótów przyspieszających co w Chromium, a zmienny promień uniemożliwia
+    // jakiekolwiek cache'owanie) i przy ~80 stroke() na klatkę to była główna przyczyna lagów.
+    // Zamiennik: ta sama ścieżka odrysowana dwa razy - raz szeroko i blado (poświata), raz
+    // normalnie (ostra kreska) - wizualnie zbliżony efekt, zero shadowBlur, dużo taniej wszędzie.
+    const glowAlphaMul = Math.min(1, 0.35 + levels.bass * 0.65);
     ctx.save();
     const T = 13;
     const rows = 26;
@@ -112,22 +119,25 @@ class SynthwaveBackground extends React.Component {
       // niezauważalne - żadnego globalnego przeskoku ani przygaszania całej siatki.
       const p = ((i / rows) + (t / T)) % 1;
       const y = horizon + Math.pow(p, 1.9) * (h - horizon), amp = 1 + p * p * 12;
-      ctx.lineWidth = 0.6 + p * 1.6; ctx.globalAlpha = Math.min(1, (0.2 + p * 0.5) * gridPulse);
+      const lw = 0.6 + p * 1.6, alpha = Math.min(1, (0.2 + p * 0.5) * gridPulse);
       ctx.beginPath();
       for (let x = 0; x <= w; x += 8) { const yv = y + Math.sin(x * 0.02 + t * (0.6 + p) + i) * amp * 0.6; x === 0 ? ctx.moveTo(x, yv) : ctx.lineTo(x, yv); }
-      ctx.stroke();
+      ctx.lineWidth = lw * 3; ctx.globalAlpha = alpha * glowAlphaMul * 0.35; ctx.stroke();
+      ctx.lineWidth = lw; ctx.globalAlpha = alpha; ctx.stroke();
     }
     const cols = 26;
     for (let i = -cols; i <= cols; i++) {
       const fx = cx + (i / cols) * w * 1.3;
       // Boczne linie zbiegające do słońca nie "jeżdżą" w głąb jak rzędy - stoją w miejscu, tylko
       // subtelnie pulsują jasnością (czysto kosmetyczne, funkcja sinus - z natury bez przeskoków).
-      ctx.globalAlpha = Math.min(1, ((0.10 + 0.22 * (1 - Math.abs(i) / cols)) + Math.sin(t * 0.4 + i * 0.3) * 0.04) * gridPulse);
-      ctx.lineWidth = 0.6 + (1 - Math.abs(i) / cols) * 1.2;
-      ctx.beginPath(); ctx.moveTo(cx, horizon); ctx.lineTo(fx, h); ctx.stroke();
+      const alpha = Math.min(1, ((0.10 + 0.22 * (1 - Math.abs(i) / cols)) + Math.sin(t * 0.4 + i * 0.3) * 0.04) * gridPulse);
+      const lw = 0.6 + (1 - Math.abs(i) / cols) * 1.2;
+      ctx.beginPath(); ctx.moveTo(cx, horizon); ctx.lineTo(fx, h);
+      ctx.lineWidth = lw * 3; ctx.globalAlpha = alpha * glowAlphaMul * 0.35; ctx.stroke();
+      ctx.lineWidth = lw; ctx.globalAlpha = alpha; ctx.stroke();
     }
     ctx.restore();
-    ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = "lighter";
     for (let i = 0; i < 70; i++) {
       const p = i / 70, y = horizon + Math.pow(p, 1.8) * (h - horizon), spread = 4 + p * (w * 0.18);
