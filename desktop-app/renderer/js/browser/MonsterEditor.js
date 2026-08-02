@@ -37,6 +37,26 @@ function resetMonster(app) {
   app.toast("Przywrócono domyślnego stworka");
 }
 
+/**
+ * Na GitHub Pages (brak window.api) stworek zapisany przez saveMonster() ląduje w localStorage
+ * TEJ przeglądarki - nigdy nie trafi do apki desktopowej (inny magazyn/origin). Zamiast tego
+ * eksportujemy go do pliku .json, który użytkownik może przesłać sobie i zaimportować w
+ * Import / Zarządzanie na desktopie (patrz import.js).
+ */
+function exportMonsterToFile(app) {
+  const me = app.state.monsterEdit; if (!me) return;
+  const payload = { nick: me.nick, params: me.params, exportedAt: new Date().toISOString() };
+  try {
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "stworek-" + window.LOLData.norm(me.nick) + ".json"; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    app.setState({ monsterEdit: null });
+    app.toast("Wyeksportowano stworka do pliku - zaimportuj go w Import / Zarządzanie na desktopie");
+  } catch (e) { app.toast("Błąd eksportu", true); }
+}
+
 function renderMonsterEditorModal(app) {
   const t = app.theme();
   const me = app.state.monsterEdit; const s = me.params;
@@ -51,7 +71,7 @@ function renderMonsterEditorModal(app) {
       h("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 22px", borderBottom: "1px solid " + t.line } },
         h("div", null,
           h("div", { style: { fontFamily: t.disp, fontWeight: 700, fontSize: 19 } }, "Stworek — " + me.nick),
-          h("div", { style: { fontSize: 12, color: t.faint, marginTop: 2 } }, "Dostosuj bestię tego gracza")),
+          h("div", { style: { fontSize: 12, color: t.faint, marginTop: 2 } }, typeof window.api === "undefined" ? "Dostosuj bestię i wyeksportuj do pliku - zaimportujesz go w Import / Zarządzanie na desktopie" : "Dostosuj bestię tego gracza")),
         h("button", { onClick: close, style: { width: 32, height: 32, borderRadius: 9, border: "1px solid " + t.line2, background: "rgba(0,0,0,.25)", color: t.text, cursor: "pointer", fontSize: 16 } }, "✕")),
       h("div", { style: { display: "grid", gridTemplateColumns: "240px minmax(0,1fr)", gap: 20, padding: "20px 22px" } },
         h("div", { style: { display: "flex", flexDirection: "column", gap: 12 } },
@@ -107,7 +127,9 @@ function renderMonsterEditorModal(app) {
             h("div", { style: monoLabel(t) }, "Cząsteczki aury · " + (s.particleCount || 0)),
             h("input", { type: "range", min: 0, max: 14, value: s.particleCount || 0, onChange: (e) => setMonsterParam(app, { particleCount: +e.target.value }), style: { width: "100%", accentColor: t.accent, cursor: "pointer" } })))),
       h("div", { style: { display: "flex", gap: 10, padding: "16px 22px", borderTop: "1px solid " + t.line } },
-        h("button", { onClick: () => saveMonster(app), style: { flex: 1, cursor: "pointer", padding: "12px", borderRadius: 11, border: "none", background: t.accent, color: "#08120D", boxShadow: "0 0 16px " + t.accent + "66", fontWeight: 800, fontSize: 14, fontFamily: t.disp } }, "Zapisz stworka"),
+        typeof window.api === "undefined"
+          ? h("button", { onClick: () => exportMonsterToFile(app), style: { flex: 1, cursor: "pointer", padding: "12px", borderRadius: 11, border: "none", background: t.accent, color: "#08120D", boxShadow: "0 0 16px " + t.accent + "66", fontWeight: 800, fontSize: 14, fontFamily: t.disp } }, "⬇ Eksportuj do pliku")
+          : h("button", { onClick: () => saveMonster(app), style: { flex: 1, cursor: "pointer", padding: "12px", borderRadius: 11, border: "none", background: t.accent, color: "#08120D", boxShadow: "0 0 16px " + t.accent + "66", fontWeight: 800, fontSize: 14, fontFamily: t.disp } }, "Zapisz stworka"),
         h("button", { onClick: close, style: { cursor: "pointer", padding: "12px 20px", borderRadius: 11, border: "1px solid " + t.line2, background: "transparent", color: t.mut, fontWeight: 700, fontSize: 14, fontFamily: t.disp } }, "Anuluj"))));
 }
 

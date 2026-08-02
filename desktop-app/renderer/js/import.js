@@ -911,3 +911,22 @@ loadMatches();
 
 /** Mecze znalezione przez skaner w poprzedniej sesji, jeszcze niezaimportowane (przetrwały restart/awarię zasilania - patrz scanFoundStore.js). */
 window.api.scanner.listSavedFound().then(addFoundGamesToHistoryTable);
+
+/** Import stworka wyeksportowanego z edytora na GitHub Pages (plik {nick, params} - patrz exportMonsterToFile w MonsterEditor.js). Zapisuje się prosto w localStorage tej apki (window.Monsters.setOverride), tak samo jak "Zapisz stworka" na desktopie. */
+document.getElementById('monster-import-file').addEventListener('change', async (e) => {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  const resultEl = document.getElementById('monster-import-result');
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    if (!data.nick || !data.params) throw new Error('nieprawidłowy plik - brak pól "nick"/"params"');
+    window.Monsters.setOverride(data.nick, data.params);
+    resultEl.textContent = `Zaimportowano stworka dla "${data.nick}".`;
+    logEvent(`Zaimportowano stworka z pliku dla gracza ${data.nick}`);
+  } catch (err) {
+    resultEl.textContent = `Błąd importu: ${err.message}`;
+    logEvent(`Błąd importu stworka: ${err.message}`);
+  }
+  e.target.value = '';
+});

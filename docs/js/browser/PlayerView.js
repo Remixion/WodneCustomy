@@ -92,7 +92,11 @@ function renderPlayerView(app, id) {
         h("div", { style: { color: t.mut, fontSize: 14, marginTop: 4 } }, pl.summoner + (pl.tag ? " #" + pl.tag : ""))
       ),
       h("div", { style: { flex: 1 } }),
-      h("button", { onClick: () => app.setState({ songEdit: pl.nick || pl.summoner, songDraft: getSong(app, pl.nick || pl.summoner) || "" }), title: "Edytuj piosenkę profilową", style: { cursor: "pointer", display: "flex", alignItems: "center", gap: 8, padding: "9px 15px", borderRadius: 10, border: "1px solid rgba(90,200,255,.4)", background: app.state.songPlaying === (pl.nick || pl.summoner) ? "rgba(90,200,255,.2)" : "rgba(90,200,255,.1)", color: "#dff3ff", fontWeight: 700, fontSize: 13, fontFamily: t.disp, marginRight: 16 } }, "♪ Piosenka"),
+      /* Edycja piosenki profilowej tylko na desktopie - na GitHub Pages każdy odwiedzający ma
+         własny, osobny localStorage, więc ustawienie piosenki tam i tak nigdy nie trafi do nikogo
+         innego (w tym do "prawdziwej" apki) - lepiej nie pokazywać przycisku, który sugerowałby
+         inaczej. Sama automatyczna odtwarzanie już zapisanej piosenki działa bez zmian wszędzie. */
+      typeof window.api === "undefined" ? null : h("button", { onClick: () => app.setState({ songEdit: pl.nick || pl.summoner, songDraft: getSong(app, pl.nick || pl.summoner) || "" }), title: "Edytuj piosenkę profilową", style: { cursor: "pointer", display: "flex", alignItems: "center", gap: 8, padding: "9px 15px", borderRadius: 10, border: "1px solid rgba(90,200,255,.4)", background: app.state.songPlaying === (pl.nick || pl.summoner) ? "rgba(90,200,255,.2)" : "rgba(90,200,255,.1)", color: "#dff3ff", fontWeight: 700, fontSize: 13, fontFamily: t.disp, marginRight: 16 } }, "♪ Piosenka"),
       h("div", { style: { display: "flex", gap: 26 } },
         bigStat(t, pl.games, "gier"),
         bigStat(t, Math.round(pl.winrate * 100) + "%", "winrate", pl.winrate >= .5 ? t.accent : t.red),

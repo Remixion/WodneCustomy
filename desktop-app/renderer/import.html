@@ -301,6 +301,20 @@
       </table>
     </section>
 
+    <section id="monster-import-section">
+      <h2>Import stworków (z edytora na GitHub Pages)</h2>
+      <p>
+        Stworki utworzone w edytorze na stronie GitHub Pages nie zapisują się
+        automatycznie tutaj (osobny magazyn przeglądarki) - tam trzeba je
+        wyeksportować do pliku .json ("⬇ Eksportuj do pliku" w edytorze
+        stworka), przesłać sobie ten plik, i zaimportować go poniżej.
+      </p>
+      <p>
+        <input type="file" id="monster-import-file" accept="application/json" />
+        <span id="monster-import-result"></span>
+      </p>
+    </section>
+
     <section id="log-section">
       <h2>Dziennik zdarzeń</h2>
       <ul id="log-list"></ul>
@@ -309,6 +323,7 @@
 
   <script src="js/common.js"></script>
   <script src="js/ddragon.js"></script>
+  <script src="js/monsters.js"></script>
   <script src="js/import.js"></script>
 </body>
 </html>
