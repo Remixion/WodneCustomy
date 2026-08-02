@@ -189,7 +189,7 @@ function _playProfileSong(app, nick) {
   const ytId = ytVideoId(song.u);
   if (ytId) {
     // Oficjalny odtwarzacz YouTube w <iframe> - patrz renderYoutubeSongPlayer niżej. Głośność dopinana przez applySongVolume po jego załadowaniu (onLoad).
-    app.setState({ songPlaying: nick, songYoutubeId: ytId, songMinimized: false });
+    app.setState({ songPlaying: nick, songYoutubeId: ytId, songMinimized: true });
     return;
   }
   const a = new Audio(song.u);
