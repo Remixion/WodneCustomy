@@ -393,3 +393,33 @@ function diagnoseMatchesHeaders() {
     );
   }
 }
+
+/**
+ * Jak diagnoseMatchesHeaders, ale dla arkusza Players - dodatkowo loguje PLAYERS_HEADERS.length
+ * na samej górze, żeby jednym spojrzeniem potwierdzić, czy ZAPISANY w edytorze kod w ogóle ma
+ * już songUrl/monsterConfig (powinno być 20), niezależnie od tego, czy wdrożenie (Nowa wersja)
+ * zdążyło się zaktualizować - to rozdziela "czy kod jest poprawny" od "czy deploy zadziałał".
+ * Samo uruchomienie z edytora WYWOŁUJE getOrCreateSheet_, więc przy okazji dopisuje brakujące
+ * nagłówki kolumn do wiersza 1 arkusza Players, jeśli jeszcze ich nie ma.
+ */
+function diagnosePlayersHeaders() {
+  Logger.log('PLAYERS_HEADERS.length = %s (powinno być 20, jeśli edytor ma już songUrl/monsterConfig): %s', PLAYERS_HEADERS.length, PLAYERS_HEADERS.join(', '));
+  var sheet = getOrCreateSheet_(SHEET_PLAYERS, PLAYERS_HEADERS);
+  var lastCol = sheet.getLastColumn();
+  var lastRow = sheet.getLastRow();
+  var colLetter = function (i) {
+    var s = '';
+    i += 1;
+    while (i > 0) { var m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); }
+    return s;
+  };
+  var actualHeaders = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  var sampleRow = lastRow >= 2 ? sheet.getRange(2, 1, 1, lastCol).getValues()[0] : [];
+  Logger.log('lastRow=%s lastCol=%s', lastRow, lastCol);
+  Logger.log('--- Kolumna | oczekiwane (PLAYERS_HEADERS) | faktyczny nagłówek (wiersz 1) | przykład wiersz 2 ---');
+  for (var i = 0; i < lastCol; i++) {
+    var expected = i < PLAYERS_HEADERS.length ? PLAYERS_HEADERS[i] : '(poza PLAYERS_HEADERS)';
+    var mismatch = i < PLAYERS_HEADERS.length && String(actualHeaders[i]) !== PLAYERS_HEADERS[i] ? '  <== NIEZGODNE' : '';
+    Logger.log(colLetter(i) + ' | ' + expected + ' | ' + actualHeaders[i] + ' | ' + JSON.stringify(sampleRow[i]) + mismatch);
+  }
+}

@@ -133,15 +133,17 @@ function setSong(app, nick, url) {
   if (url) s[k] = url; else delete s[k];
   try { localStorage.setItem("wcPlayerSongs_v4", JSON.stringify(s)); } catch (e) {}
   app._songs = s;
+  const afterSave = () => { if (url) _playProfileSong(app, nick); else _stopProfileSong(app); };
   const pl = findPlayerRecordByNick(app, nick);
   if (pl && pl.puuid && typeof window.api !== "undefined") {
-    window.api.store.updatePlayerField(pl.puuid, "songUrl", url || "").then(() => app.reload());
+    window.api.store.updatePlayerField(pl.puuid, "songUrl", url || "").then(() => app.reload().then(afterSave));
   } else {
     app.forceUpdate();
+    afterSave();
   }
 }
 function assignedSong(app, nick) {
-  const stored = playerSongs(app)[window.LOLData.norm(nick)];
+  const stored = getSong(app, nick);
   return stored ? { u: stored, n: "Piosenka" } : null;
 }
 
