@@ -8,8 +8,9 @@
    odtwarza dokładnie to zachowanie, bez martwego kodu (resolveAndPlayYT/playSoundcloud/
    playMonochrome nigdy nie były wywoływane w finalnej wersji komponentu). */
 
-function loadMuted() { try { return localStorage.getItem("wcMuted") !== "0"; } catch (e) { return true; } }
-function loadVolume() { try { const v = parseFloat(localStorage.getItem("wcVol")); return isFinite(v) ? v : 0.55; } catch (e) { return 0.55; } }
+/** Domyślnie muzyka gra automatycznie na 50% głośności (dopóki użytkownik nie wyciszy jej ręcznie - wtedy ta decyzja jest pamiętana). */
+function loadMuted() { try { return localStorage.getItem("wcMuted") === "1"; } catch (e) { return false; } }
+function loadVolume() { try { const v = parseFloat(localStorage.getItem("wcVol")); return isFinite(v) ? v : 0.5; } catch (e) { return 0.5; } }
 
 function toggleMute(app) {
   const muted = !app.state.muted;
@@ -36,6 +37,27 @@ function setVolume(app, v) {
 function saveAudioPos(app) {
   const el = app.audioRef.current;
   if (el) { try { localStorage.setItem("wcAudioPos", String(el.currentTime || 0)); } catch (e) {} }
+}
+
+/**
+ * Odtwarza muzykę w tle automatycznie po wejściu na stronę. Przeglądarki (w przeciwieństwie do
+ * Electrona) blokują autoplay ze dźwiękiem bez wcześniejszej interakcji użytkownika ze stroną -
+ * gdy tak się stanie, puszczamy ją od razu wyciszoną (na to zgoda jest zawsze) i zdejmujemy
+ * wyciszenie przy pierwszym kliknięciu/klawiszu/dotyku, żeby dźwięk i tak włączył się bez
+ * osobnego przycisku "kliknij, aby posłuchać".
+ */
+function playBgAudio(app, el) {
+  el.volume = app.state.volume;
+  const pr = el.play();
+  if (pr && pr.catch) {
+    pr.catch(() => {
+      el.muted = true;
+      el.play().catch(() => {});
+      const unmute = () => { el.muted = false; };
+      window.addEventListener("pointerdown", unmute, { once: true });
+      window.addEventListener("keydown", unmute, { once: true });
+    });
+  }
 }
 
 function playerSongs(app) {

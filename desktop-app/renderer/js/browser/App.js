@@ -1,5 +1,15 @@
 /* Główny komponent "Przeglądarki meczy" - port renderApp/renderView/renderSidebar/init/routing z Match Browser.dc.html, podłączony pod nasze prawdziwe dane (browserData.js + window.api.store) zamiast CSV/localStorage. window.BrowserViews (rejestr widoków) jest inicjalizowany w helpers.js - ten plik ładuje się PIERWSZY, przed jakimkolwiek plikiem widoku, który mógłby do niego zapisywać. */
 
+/**
+ * Czeka aż przeglądarka wczyta czcionki (Space Grotesk/JetBrains Mono) zanim pokażemy właściwy
+ * layout - zapobiega przesunięciu sztywnych siatek (np. Losowanie) fallbackowym fontem, który po
+ * doładowaniu Google Fonts nagle zmienia metryki. Limit czasu, żeby nigdy nie zawiesić ładowania.
+ */
+function waitForFonts() {
+  if (!document.fonts || !document.fonts.ready) return Promise.resolve();
+  return Promise.race([document.fonts.ready, new Promise((resolve) => setTimeout(resolve, 1500))]);
+}
+
 class BrowserApp extends React.Component {
   state = {
     ready: false, err: null, matches: [], agg: null, statics: null,
@@ -33,8 +43,10 @@ class BrowserApp extends React.Component {
       const playersByPuuid = buildPlayersByPuuid(allPlayers);
       const matches = L.buildMatchesFromStore(stored, playersByPuuid, statics, extractRawStatsMap);
       const agg = L.aggregate(matches);
+      await waitForFonts();
       this.setState({ ready: true, statics, matches, agg, playersByPuuid }, () => this.readHash());
     } catch (e) {
+      await waitForFonts();
       this.setState({ ready: true, err: String(e && e.message || e), statics, matches: [], agg: L.aggregate([]) });
     }
   }
@@ -70,7 +82,7 @@ class BrowserApp extends React.Component {
     if (!this.state.ready) return this.renderLoading();
     return h("div", { className: "lolscroll", style: { display: "flex", flexDirection: "column", minHeight: "100vh", background: "transparent", position: "relative" } },
       h(SynthwaveBackground, null),
-      h("audio", { ref: this.audioRef, src: "assets/neon-waterfall.mp3", loop: true, preload: "auto", onTimeUpdate: () => { if (!this._savedT || Date.now() - this._savedT > 4000) { this._savedT = Date.now(); saveAudioPos(this); } }, onLoadedMetadata: (e) => { try { const p = parseFloat(localStorage.getItem("wcAudioPos") || "0"); if (p && p < e.target.duration) e.target.currentTime = p; } catch (er) {} if (!this.state.muted) { e.target.volume = this.state.volume; const pr = e.target.play(); if (pr && pr.catch) pr.catch(() => {}); } }, style: { display: "none" } }),
+      h("audio", { ref: this.audioRef, src: "assets/neon-waterfall.mp3", loop: true, preload: "auto", onTimeUpdate: () => { if (!this._savedT || Date.now() - this._savedT > 4000) { this._savedT = Date.now(); saveAudioPos(this); } }, onLoadedMetadata: (e) => { try { const p = parseFloat(localStorage.getItem("wcAudioPos") || "0"); if (p && p < e.target.duration) e.target.currentTime = p; } catch (er) {} if (!this.state.muted) playBgAudio(this, e.target); }, style: { display: "none" } }),
       this.renderSidebar(),
       h("main", { className: "lolscroll", style: { flex: 1, minWidth: 0, position: "relative", zIndex: 1 } }, this.renderView()),
       this.state.playerModal && window.BrowserViews.playerModal ? window.BrowserViews.playerModal(this) : null,
