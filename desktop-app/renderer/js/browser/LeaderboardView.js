@@ -1,8 +1,39 @@
 /* Ranking (Gracze/Championi/Mapa/Duo) - port renderLeaderboard/renderPlayerBoard/renderChampBoard/renderMapBoard/renderDuos z Match Browser.dc.html. Duo było w oryginale zbudowane, ale nigdzie nie podpięte w nawigacji - tu dopięte jako 4. zakładka. */
 
+/**
+ * Statystyki gracza przeliczone TYLKO z jego meczów na danej roli (role === "ALL" - bez zmian,
+ * zwraca już wyliczone p.games/p.wins/p.winrate/p.kda/p.avg jak dotychczas). Gracz bez żadnego
+ * meczu na wybranej roli dostaje null - filtrowany z rankingu, a nie pokazywany z zerami.
+ */
+function computePlayerStatsForRole(p, role) {
+  if (!role || role === "ALL") return { games: p.games, wins: p.wins, winrate: p.winrate, kda: p.kda, avg: p.avg };
+  const ms = (p.matches || []).filter((m) => m.role === role);
+  const games = ms.length;
+  if (!games) return null;
+  const wins = ms.filter((m) => m.win).length;
+  const sum = (f) => ms.reduce((s, m) => s + (m[f] || 0), 0);
+  const sumK = sum("k"), sumD = sum("d"), sumA = sum("a");
+  const avg = {
+    k: sumK / games, d: sumD / games, a: sumA / games,
+    csPerMin: ms.reduce((s, m) => s + (m.cs || 0) / ((m.durationSec || 1) / 60), 0) / games,
+    goldPerMin: ms.reduce((s, m) => s + (m.gold || 0) / ((m.durationSec || 1) / 60), 0) / games,
+    dmgChamp: sum("dmgChamp") / games,
+    vision: sum("vision") / games,
+  };
+  return { games, wins, winrate: wins / games, kda: (sumK + sumA) / Math.max(1, sumD), avg };
+}
+/** Gracze z rankingu, przefiltrowani/przeliczeni pod wybraną rolę (app.state.roleFilter, domyślnie "ALL" - wszyscy, bez zmian). */
+function rankedPlayersForRole(app) {
+  const role = app.state.roleFilter || "ALL";
+  return Object.values(app.state.agg.players).map((p) => {
+    const stats = computePlayerStatsForRole(p, role);
+    return stats ? Object.assign({}, p, stats) : null;
+  }).filter(Boolean);
+}
+
 function exportRanking(app) {
   const sk = app.state.sortKey;
-  let players = Object.values(app.state.agg.players);
+  let players = rankedPlayersForRole(app);
   const getV = (p) => sk === "kda" ? p.kda : sk === "winrate" ? p.winrate : sk === "games" ? p.games : (p.avg[sk] || 0);
   players = players.slice().sort((a, b) => getV(b) - getV(a));
   const head = ["rank", "nick", "summoner", "gry", "winrate", "kda", "k/mecz", "d/mecz", "a/mecz", "csPerMin", "goldPerMin", "dmgChamp", "vision"];
@@ -11,7 +42,7 @@ function exportRanking(app) {
   try {
     const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = "ranking_" + sk + ".csv"; a.click();
+    const a = document.createElement("a"); a.href = url; a.download = "ranking_" + sk + "_" + (app.state.roleFilter || "ALL").toLowerCase() + ".csv"; a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     app.toast("Wyeksportowano ranking (" + players.length + " graczy)");
   } catch (e) { app.toast("Błąd eksportu", true); }
@@ -20,16 +51,21 @@ function exportRanking(app) {
 function renderPlayerBoard(app) {
   const t = app.theme();
   const sorts = [["kda", "KDA"], ["k", "Zabójstwa"], ["csPerMin", "CS/min"], ["goldPerMin", "Gold/min"], ["dmgChamp", "DMG"], ["vision", "Vision"], ["winrate", "Winrate"], ["games", "Gry"]];
-  let players = Object.values(app.state.agg.players);
+  const roleFilter = app.state.roleFilter || "ALL";
+  let players = rankedPlayersForRole(app);
   const sk = app.state.sortKey || "kda";
   const getV = (p) => sk === "kda" ? p.kda : sk === "winrate" ? p.winrate : sk === "games" ? p.games : (p.avg[sk] || 0);
   players = players.slice().sort((a, b) => getV(b) - getV(a));
   const fmtVal = (p) => { const v = getV(p); if (sk === "winrate") return Math.round(v * 100) + "%"; if (sk === "games") return v; if (sk === "kda" || sk === "csPerMin") return v.toFixed(2); if (sk === "goldPerMin") return Math.round(v); if (sk === "dmgChamp") return fmtK(v); if (sk === "vision") return v.toFixed(1); return v.toFixed(1); };
   const maxV = Math.max.apply(null, players.map(getV).concat([0.0001]));
   return h("div", null,
+    h("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12, alignItems: "center" } },
+      chip(t, "Wszystkie role", roleFilter === "ALL", () => app.setState({ roleFilter: "ALL" })),
+      window.LOLData.ROLES.map((r) => chip(t, roleTag(r), roleFilter === r, () => app.setState({ roleFilter: r })))),
     h("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 22, alignItems: "center" } }, sorts.map(([k, l]) => chip(t, l, sk === k, () => app.setState({ sortKey: k }))),
       h("div", { key: "sp", style: { flex: 1, minWidth: 20 } }),
       h("button", { key: "exp", onClick: () => exportRanking(app), style: { cursor: "pointer", padding: "8px 14px", borderRadius: 999, border: "1px solid " + t.line2, background: "transparent", color: t.text, fontWeight: 700, fontSize: 13, fontFamily: t.disp } }, "↓ Eksport CSV")),
+    !players.length ? app.empty("Brak graczy z meczami na tej roli.") :
     h("div", { style: { background: t.panel, border: "1px solid " + t.line, borderRadius: 16, overflow: "hidden" } },
       players.map((p, i) => h("div", { key: p.key, onClick: () => app.nav("player", p.puuid || p.nick), style: { display: "grid", gridTemplateColumns: "44px minmax(0,1fr) 90px 90px minmax(160px,220px)", gap: 12, alignItems: "center", padding: "13px 20px", cursor: "pointer", borderBottom: i < players.length - 1 ? "1px solid " + t.line : "none", background: i < 3 ? "rgba(61,220,151,.03)" : "transparent" }, onMouseEnter: (e) => e.currentTarget.style.background = "rgba(255,255,255,.03)", onMouseLeave: (e) => e.currentTarget.style.background = i < 3 ? "rgba(61,220,151,.03)" : "transparent" },
         h("div", { style: { fontFamily: t.disp, fontWeight: 700, fontSize: 17, color: i === 0 ? "#E8B84B" : i < 3 ? t.accent : t.faint, textAlign: "center" } }, i + 1),
