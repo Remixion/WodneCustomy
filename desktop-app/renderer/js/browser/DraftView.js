@@ -423,6 +423,11 @@ function draftSlot(app, side, role) {
   const justLocked = (app._roll && app._roll.flashAt[fk] && (performance.now() - app._roll.flashAt[fk] < 480)) || (app._champRoll && app._champRoll.flashAt[fk] && (performance.now() - app._champRoll.flashAt[fk] < 480));
   const champ = (app.state.draftChamp || {})[fk];
   const champCycling = app.state.rollingChamps && app._champRoll && !app._champRoll.locked[fk];
+  // Kropka zielona/czerwona - czy flaga "unikaj roli z poprzedniego meczu" faktycznie się
+  // powiodła dla TEGO konkretnego przydziału. Tylko po ustaleniu wyniku (nie w trakcie
+  // "kręcenia się" bębna) i tylko gdy gracz ma w ogóle znaną poprzednią rolę.
+  const lastRole = p ? draftLastRole(p) : null;
+  const roleCheck = (p && lastRole && !rolling && !app.state.rollingChamps && getDraftSettings(app).avoidPreviousRole) ? (lastRole === role ? "bad" : "good") : null;
   return h("div", {
     key: role,
     onDragOver: (e) => { if (rolling) return; e.preventDefault(); e.currentTarget.style.boxShadow = "inset 0 0 0 2px " + col; },
@@ -447,7 +452,8 @@ function draftSlot(app, side, role) {
         (!rolling && !app.state.rollingChamps && champ.rerolls < getDraftSettings(app).rerollLimit) ? h("button", { onClick: (e) => { e.stopPropagation(); rerollChamp(app, side, role); }, title: "Losuj postać ponownie", style: { flex: "0 0 auto", cursor: "pointer", width: 26, height: 26, borderRadius: 7, border: "1px solid rgba(90,200,255,.4)", background: "rgba(90,200,255,.14)", color: "#dff3ff", fontSize: 13 } }, "⟳") : null) : null),
     h("div", { style: { display: "flex", alignItems: "center", gap: 8, padding: "10px 9px", borderTop: "1px solid " + t.line, background: "rgba(0,0,0,.32)" } },
       draftRoleIcon(role, 20),
-      h("span", { style: { fontFamily: t.disp, fontWeight: 700, fontSize: 16, color: p ? t.text : t.faint, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: 1, textAlign: "center" } }, p ? (p.nick || p.summoner) : "—")),
+      h("span", { style: { fontFamily: t.disp, fontWeight: 700, fontSize: 16, color: p ? t.text : t.faint, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: 1, textAlign: "center" } }, p ? (p.nick || p.summoner) : "—"),
+      roleCheck ? h("span", { title: (roleCheck === "bad" ? "Grał tę rolę w poprzednim meczu" : "Nie grał tej roli w poprzednim meczu") + " (" + DRAFT_ROLE_LABEL[lastRole] + ")", style: { flex: "0 0 auto", width: 9, height: 9, borderRadius: "50%", background: roleCheck === "bad" ? "#ff5d6c" : "#3ddc97", boxShadow: "0 0 8px " + (roleCheck === "bad" ? "#ff5d6c" : "#3ddc97") } }) : null),
     (p && app.state.roleMenu === p.key) ? roleMenuOverlay(app, p) : null);
 }
 
@@ -466,7 +472,6 @@ function draftTeamPanel(app, side) {
 
 function renderDraftView(app) {
   const t = app.theme();
-  const draftSettings = getDraftSettings(app);
   const allPlayers = Object.values(getAllDraftPlayers(app));
   const q = (app.state.draftSearch || "").toLowerCase().trim();
   const sort = app.state.draftSort || "games";
@@ -497,13 +502,9 @@ function renderDraftView(app) {
             h("div", { style: { display: "flex", flexWrap: "wrap", gap: 5 } }, [["games", "Ilość gier"], ["alpha", "A–Z"], ["recent", "Ostatnia gra"]].map(([k, l]) => chip(t, l, (app.state.draftSort || "games") === k, () => app.setState({ draftSort: k }))))),
           h("div", { className: "lolscroll", style: { flex: 1, minHeight: 0, overflowY: "auto" } }, players.length ? players.map((p) => {
             const on = !!used[p.key];
-            const lastRole = draftSettings.avoidPreviousRole ? draftLastRole(p) : null;
             return h("div", { key: p.key, draggable: true, onDragStart: (e) => { e.dataTransfer.setData("text/plain", p.key); e.dataTransfer.effectAllowed = "move"; }, onClick: () => addToNextSlot(app, p.key), title: on ? "Kliknij, aby usunąć ze slotu" : "Kliknij, aby dodać do drużyny", style: { position: "relative", cursor: "pointer", display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid " + t.line, background: on ? "rgba(61,220,151,.08)" : "transparent", opacity: on ? .65 : 1 }, onMouseEnter: (e) => { if (!on) e.currentTarget.style.background = "rgba(255,255,255,.03)"; }, onMouseLeave: (e) => { e.currentTarget.style.background = on ? "rgba(61,220,151,.08)" : "transparent"; } },
               profileImg(app, p, 30),
               h("div", { style: { minWidth: 0, flex: 1 } }, h("div", { style: { fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, p.nick || p.summoner)),
-              lastRole ? h("div", { title: "Poprzedni mecz: " + DRAFT_ROLE_LABEL[lastRole], style: { flex: "0 0 auto", display: "flex", alignItems: "center", gap: 4, padding: "2px 6px", borderRadius: 6, background: "rgba(255,180,80,.12)", border: "1px solid rgba(255,180,80,.3)" } },
-                draftRoleIcon(lastRole, 13),
-                h("span", { style: { fontSize: 9.5, fontWeight: 700, color: "#ffcf8a", fontFamily: t.mono, letterSpacing: .3 } }, DRAFT_ROLE_LABEL[lastRole])) : null,
               on ? h("span", { style: { fontSize: 12, color: t.accent, fontWeight: 800 } }, "✓") : h("span", { style: { fontSize: 15, color: t.faint } }, "+"));
           }) : h("div", { style: { padding: "24px 16px", textAlign: "center", color: t.faint, fontSize: 12.5 } }, "Brak graczy")))),
       h("div", { style: { display: "flex", gap: 18, alignItems: "stretch" } },
