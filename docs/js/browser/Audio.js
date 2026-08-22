@@ -15,6 +15,15 @@ function ytVideoId(url) {
   return m ? m[1] : null;
 }
 
+/** Wyciąga liczbę sekund z parametru "od której sekundy udostępnij" (t=25, t=25s albo start=25)
+ * - regexem po całym linku, nie przez URLSearchParams, bo linki z youtu.be bywają wklejane z
+ * "&t=" zamiast poprawnego "?t=" (np. z paska adresu po ręcznym dopisaniu) i wtedy URLSearchParams
+ * by tego nie znalazło. Zwraca 0, gdy nie ma takiego parametru (start od początku, jak dotychczas). */
+function ytStartSeconds(url) {
+  const m = String(url || "").match(/[?&](?:t|start)=(\d+)/);
+  return m ? parseInt(m[1], 10) : 0;
+}
+
 /** Domyślnie muzyka gra automatycznie na 50% głośności (dopóki użytkownik nie wyciszy jej ręcznie - wtedy ta decyzja jest pamiętana). */
 function loadMuted() { try { return localStorage.getItem("wcMuted") === "1"; } catch (e) { return false; } }
 function loadVolume() { try { const v = parseFloat(localStorage.getItem("wcVol")); return isFinite(v) ? v : 0.5; } catch (e) { return 0.5; } }
@@ -177,7 +186,7 @@ function applySongVolume(app) {
 function _stopProfileSong(app, keepBg) {
   if (app._songEl) { app._songEl.pause(); app._songEl = null; }
   app._songYtEl = null;
-  if (app.state.songPlaying || app.state.songYoutubeId) app.setState({ songPlaying: null, songYoutubeId: null, songMinimized: false });
+  if (app.state.songPlaying || app.state.songYoutubeId) app.setState({ songPlaying: null, songYoutubeId: null, songYoutubeStart: 0, songMinimized: false });
   if (!keepBg) _resumeBg(app);
 }
 function _playProfileSong(app, nick) {
@@ -189,7 +198,7 @@ function _playProfileSong(app, nick) {
   const ytId = ytVideoId(song.u);
   if (ytId) {
     // Oficjalny odtwarzacz YouTube w <iframe> - patrz renderYoutubeSongPlayer niżej. Głośność dopinana przez applySongVolume po jego załadowaniu (onLoad).
-    app.setState({ songPlaying: nick, songYoutubeId: ytId, songMinimized: true });
+    app.setState({ songPlaying: nick, songYoutubeId: ytId, songYoutubeStart: ytStartSeconds(song.u), songMinimized: true });
     return;
   }
   const a = new Audio(song.u);
@@ -246,7 +255,8 @@ function renderYoutubeSongPlayer(app) {
   const t = app.theme();
   const id = app.state.songYoutubeId;
   const min = !!app.state.songMinimized;
-  const src = "https://www.youtube.com/embed/" + id + "?autoplay=1&loop=1&playlist=" + id + "&enablejsapi=1";
+  const start = app.state.songYoutubeStart || 0;
+  const src = "https://www.youtube.com/embed/" + id + "?autoplay=1&loop=1&playlist=" + id + "&enablejsapi=1" + (start > 0 ? "&start=" + start : "");
   // enablejsapi=1 + ref na <iframe> pozwala sterować głośnością tego konkretnego odtwarzacza przez postMessage (patrz applySongVolume) - bez tego link do YouTube grałby zawsze na swojej domyślnej głośności, niezależnie od suwaka/wyciszenia w apce.
   // Zminimalizowanie NIE odmontowuje <iframe> (ten sam key co przed minimalizacją) - tylko zwija jego wysokość do 0, więc YouTube dalej gra dźwięk w tle bez przerywania/restartu.
   return h("div", { style: { position: "fixed", right: 16, bottom: 16, zIndex: 70, width: min ? 220 : 300, borderRadius: 14, overflow: "hidden", border: "1px solid rgba(90,200,255,.4)", boxShadow: "0 14px 40px rgba(0,0,0,.6), 0 0 22px rgba(90,200,255,.25)", background: "#000", transition: "width .2s ease" } },
