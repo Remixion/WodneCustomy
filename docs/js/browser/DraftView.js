@@ -2,6 +2,7 @@
 
 const DRAFT_ROLES = ["TOP", "JNG", "MID", "BOT", "SUP"];
 const DRAFT_ROLE_ICON = { TOP: "top", JNG: "jungle", MID: "middle", BOT: "bottom", SUP: "utility" };
+const DRAFT_ROLE_LABEL = { TOP: "Top", JNG: "Jungla", MID: "Mid", BOT: "ADC", SUP: "Support" };
 
 /* Ustawienia losowania (koło zębate w Losowaniu) - trzymane w localStorage (przeżywają
    przeładowanie, jak muted/volume w Audio.js), a nie w schemacie App.js's state = {...}, bo
@@ -65,6 +66,13 @@ function draftRankScore(app, p) {
   return tierIdx * 400 + subIdx * 100 + Math.min(99, Number(raw.soloLP) || 0);
 }
 
+/** Rola z ostatniego (najwyższy gid) odnotowanego meczu gracza - null, gdy brak historii (np. gracz dodany ręcznie). Współdzielone przez assignRolesForPool (flaga avoidPreviousRole) i wizualną odznakę w liście graczy. */
+function draftLastRole(p) {
+  const ms = p.matches || [];
+  const last = ms.reduce((mx, m) => (!mx || (m.gid || 0) > (mx.gid || 0) ? m : mx), null);
+  return last ? last.role : null;
+}
+
 /**
  * Przydziela graczy z puli do 5 ról jednej drużyny, próbując uszanować (w tej kolejności
  * ważności): role zablokowane przez gracza (roleBlock - "role, których nie gra") i unikanie
@@ -77,7 +85,6 @@ function draftRankScore(app, p) {
 function assignRolesForPool(app, poolPlayers, rnd) {
   const settings = getDraftSettings(app);
   const roleBlock = app.state.roleBlock || {};
-  const lastRole = (p) => { const ms = p.matches || []; const last = ms.reduce((mx, m) => (!mx || (m.gid || 0) > (mx.gid || 0) ? m : mx), null); return last ? last.role : null; };
   const roles = shuffleWith(DRAFT_ROLES, rnd);
   let remaining = shuffleWith(poolPlayers, rnd);
   const result = {};
@@ -85,7 +92,7 @@ function assignRolesForPool(app, poolPlayers, rnd) {
     if (!remaining.length) return; // pula wyczerpana wcześniej niż role - slot zostaje pusty, tak jak dotychczas przy niepełnych drużynach
     const eligible = (relaxAvoid, relaxBlock) => remaining.filter((p) => {
       if (!relaxBlock && settings.respectRoleBlock && (roleBlock[p.key] || {})[role]) return false;
-      if (!relaxAvoid && settings.avoidPreviousRole && lastRole(p) === role) return false;
+      if (!relaxAvoid && settings.avoidPreviousRole && draftLastRole(p) === role) return false;
       return true;
     });
     let candidates = eligible(false, false);
@@ -459,6 +466,7 @@ function draftTeamPanel(app, side) {
 
 function renderDraftView(app) {
   const t = app.theme();
+  const draftSettings = getDraftSettings(app);
   const allPlayers = Object.values(getAllDraftPlayers(app));
   const q = (app.state.draftSearch || "").toLowerCase().trim();
   const sort = app.state.draftSort || "games";
@@ -489,9 +497,13 @@ function renderDraftView(app) {
             h("div", { style: { display: "flex", flexWrap: "wrap", gap: 5 } }, [["games", "Ilość gier"], ["alpha", "A–Z"], ["recent", "Ostatnia gra"]].map(([k, l]) => chip(t, l, (app.state.draftSort || "games") === k, () => app.setState({ draftSort: k }))))),
           h("div", { className: "lolscroll", style: { flex: 1, minHeight: 0, overflowY: "auto" } }, players.length ? players.map((p) => {
             const on = !!used[p.key];
+            const lastRole = draftSettings.avoidPreviousRole ? draftLastRole(p) : null;
             return h("div", { key: p.key, draggable: true, onDragStart: (e) => { e.dataTransfer.setData("text/plain", p.key); e.dataTransfer.effectAllowed = "move"; }, onClick: () => addToNextSlot(app, p.key), title: on ? "Kliknij, aby usunąć ze slotu" : "Kliknij, aby dodać do drużyny", style: { position: "relative", cursor: "pointer", display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid " + t.line, background: on ? "rgba(61,220,151,.08)" : "transparent", opacity: on ? .65 : 1 }, onMouseEnter: (e) => { if (!on) e.currentTarget.style.background = "rgba(255,255,255,.03)"; }, onMouseLeave: (e) => { e.currentTarget.style.background = on ? "rgba(61,220,151,.08)" : "transparent"; } },
               profileImg(app, p, 30),
               h("div", { style: { minWidth: 0, flex: 1 } }, h("div", { style: { fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, p.nick || p.summoner)),
+              lastRole ? h("div", { title: "Poprzedni mecz: " + DRAFT_ROLE_LABEL[lastRole], style: { flex: "0 0 auto", display: "flex", alignItems: "center", gap: 4, padding: "2px 6px", borderRadius: 6, background: "rgba(255,180,80,.12)", border: "1px solid rgba(255,180,80,.3)" } },
+                draftRoleIcon(lastRole, 13),
+                h("span", { style: { fontSize: 9.5, fontWeight: 700, color: "#ffcf8a", fontFamily: t.mono, letterSpacing: .3 } }, DRAFT_ROLE_LABEL[lastRole])) : null,
               on ? h("span", { style: { fontSize: 12, color: t.accent, fontWeight: 800 } }, "✓") : h("span", { style: { fontSize: 15, color: t.faint } }, "+"));
           }) : h("div", { style: { padding: "24px 16px", textAlign: "center", color: t.faint, fontSize: 12.5 } }, "Brak graczy")))),
       h("div", { style: { display: "flex", gap: 18, alignItems: "stretch" } },
