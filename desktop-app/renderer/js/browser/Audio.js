@@ -217,7 +217,7 @@ function autoPlaySong(app, id) {
   try {
     const pl = app.state.agg.players[id] || Object.values(app.state.agg.players).find((x) => x.nick === id || x.puuid === id);
     const nick = pl ? (pl.nick || pl.summoner) : id;
-    if (!nick || !getSong(app, nick)) return;
+    if (!nick || !getSong(app, nick)) { _stopProfileSong(app); return; } // profil bez własnej piosenki - zatrzymaj ewentualną piosenkę POPRZEDNIEGO profilu, zamiast zostawić ją grającą w tle
     _playProfileSong(app, nick);
   } catch (e) {}
 }

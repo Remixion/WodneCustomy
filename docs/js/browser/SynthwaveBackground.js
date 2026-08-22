@@ -54,6 +54,14 @@ class SynthwaveBackground extends React.Component {
 
   drawBg(t) {
     const b = this.bg; if (!b || !b.w) return;
+    // Egzekwowanie "profil z przypisaną piosenką = pod żadnym pozorem nie gra główny motyw" na
+    // KAŻDEJ klatce (nie tylko w konkretnych miejscach jak onLoadedMetadata/ensureBgAudioPlaying,
+    // które mogą się rozminąć w czasie z nawigacją) - samonaprawiający się bezpiecznik: nawet
+    // gdyby coś inne zdążyło uruchomić motyw, w ciągu jednej klatki (~16ms) zostaje zapauzowany.
+    if (this.props.audioApp) {
+      const bgEl = this.props.audioApp.audioRef && this.props.audioApp.audioRef.current;
+      if (bgEl && !bgEl.paused && typeof currentProfileHasSong === "function" && currentProfileHasSong(this.props.audioApp)) bgEl.pause();
+    }
     const pal = Object.assign({}, SYNTHBG_DEFAULT_PALETTE, this.props.palette || {});
     const glowRgb = synthbgHexToRgb(pal.glow), gridRgb = synthbgHexToRgb(pal.grid);
     const starRgb = synthbgHexToRgb(pal.star), particleRgb = synthbgHexToRgb(pal.particle);
