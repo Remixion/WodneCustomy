@@ -306,6 +306,29 @@
       return { a: pa, b: pb, games: d.games, wins: d.wins, winrate: d.games ? d.wins / d.games : 0 };
     }).filter((d) => d.a.nick && d.b.nick).sort((a, b) => b.games - a.games || b.winrate - a.winrate);
 
+    // Mecze, w których dwóch graczy było PRZECIWKO siebie (przeciwne drużyny) - w
+    // przeciwieństwie do duos (ta sama drużyna) każdy mecz ma dokładnie jednego zwycięzcę z
+    // tej pary, więc trzymamy zwycięstwa OSOBNO dla "a" i "b" (aWins+bWins zawsze = games).
+    const versusMap = {};
+    matches.forEach((m) => {
+      const bluePs = m.teams.blue.players, redPs = m.teams.red.players, blueWon = m.teams.blue.win;
+      bluePs.forEach((pBlue) => {
+        redPs.forEach((pRed) => {
+          const ka = norm(pBlue.nick) || pBlue.puuid, kb = norm(pRed.nick) || pRed.puuid;
+          const [first, second] = [ka, kb].sort();
+          const pk = first + "__" + second;
+          const v = versusMap[pk] || (versusMap[pk] = { a: first, b: second, games: 0, aWins: 0, bWins: 0 });
+          v.games++;
+          const blueIsA = ka === first;
+          if (blueWon === blueIsA) v.aWins++; else v.bWins++;
+        });
+      });
+    });
+    const versus = Object.values(versusMap).map((v) => {
+      const pa = players[v.a] || {}, pb = players[v.b] || {};
+      return { a: pa, b: pb, games: v.games, aWins: v.aWins, bWins: v.bWins };
+    }).filter((v) => v.a.nick && v.b.nick).sort((a, b) => b.games - a.games);
+
     Object.values(champs).forEach((ch) => {
       ch.winrate = ch.games ? ch.wins / ch.games : 0;
       ch.kda = (ch.k + ch.a) / Math.max(1, ch.d);
@@ -314,7 +337,7 @@
       ch.avg.kda = ch.kda;
     });
 
-    return { players, roleAverages, champions: champs, duos };
+    return { players, roleAverages, champions: champs, duos, versus };
   }
 
   function streaks(ms) {

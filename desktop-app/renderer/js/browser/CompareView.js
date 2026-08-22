@@ -36,6 +36,19 @@ function duoRecord(app, pa, pb) {
     bigStat(t, Math.round(duo.winrate * 100) + "%", "winrate razem", duo.winrate >= .5 ? t.accent : t.red));
 }
 
+function versusRecord(app, pa, pb) {
+  const t = app.theme();
+  const v = (app.state.agg.versus || []).find((x) => (x.a.key === pa.key && x.b.key === pb.key) || (x.a.key === pb.key && x.b.key === pa.key));
+  if (!v) return h("div", { style: { fontSize: 13, color: t.faint, textAlign: "center", padding: "18px 0" } }, "Ci gracze nigdy nie grali przeciwko sobie.");
+  const paIsA = v.a.key === pa.key;
+  const paWins = paIsA ? v.aWins : v.bWins, pbWins = paIsA ? v.bWins : v.aWins;
+  const paWinrate = v.games ? paWins / v.games : 0;
+  return h("div", { style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 26, padding: "10px 0" } },
+    bigStat(t, v.games, "mecze przeciwko sobie"),
+    bigStat(t, paWins + "W " + pbWins + "L", "bilans " + (pa.nick || pa.summoner)),
+    bigStat(t, Math.round(paWinrate * 100) + "%", "winrate vs " + (pb.nick || pb.summoner), paWinrate >= .5 ? t.accent : t.red));
+}
+
 function renderCompareView(app) {
   const t = app.theme();
   const players = app.state.agg.players;
@@ -61,9 +74,12 @@ function renderCompareView(app) {
     !pa || !pb ? app.empty("Wybierz dwóch graczy, aby zobaczyć porównanie.") :
       h("div", null,
         h("div", { style: { background: t.panel, border: "1px solid " + t.line, borderRadius: 16, padding: "20px 24px", marginBottom: 20 } }, rows.map(([label, va, vb, hb, fmt]) => cmpBar(t, label, va || 0, vb || 0, hb, fmt))),
-        h("div", null,
+        h("div", { style: { marginBottom: 20 } },
           h("h2", { style: sectionH(t) }, "Wspólne mecze"),
-          h("div", { style: { background: t.panel, border: "1px solid " + t.line, borderRadius: 16 } }, duoRecord(app, pa, pb))))
+          h("div", { style: { background: t.panel, border: "1px solid " + t.line, borderRadius: 16 } }, duoRecord(app, pa, pb))),
+        h("div", null,
+          h("h2", { style: sectionH(t) }, "Mecze przeciwko"),
+          h("div", { style: { background: t.panel, border: "1px solid " + t.line, borderRadius: 16 } }, versusRecord(app, pa, pb))))
   );
 }
 
