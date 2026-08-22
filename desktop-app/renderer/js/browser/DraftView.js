@@ -3,6 +3,102 @@
 const DRAFT_ROLES = ["TOP", "JNG", "MID", "BOT", "SUP"];
 const DRAFT_ROLE_ICON = { TOP: "top", JNG: "jungle", MID: "middle", BOT: "bottom", SUP: "utility" };
 
+/* Ustawienia losowania (koło zębate w Losowaniu) - trzymane w localStorage (przeżywają
+   przeładowanie, jak muted/volume w Audio.js), a nie w schemacie App.js's state = {...}, bo
+   podobnie jak draftSearch/draftSort/roleBlock to stan czysto tego widoku, nigdzie indziej
+   nieczytany. */
+const DEFAULT_DRAFT_SETTINGS = { rerollLimit: 3, seed: "", respectRoleBlock: true, avoidPreviousRole: false, balanceByRank: false };
+function loadDraftSettings() {
+  try { return Object.assign({}, DEFAULT_DRAFT_SETTINGS, JSON.parse(localStorage.getItem("wcDraftSettings") || "{}")); }
+  catch (e) { return Object.assign({}, DEFAULT_DRAFT_SETTINGS); }
+}
+function getDraftSettings(app) { return app.state.draftSettings || loadDraftSettings(); }
+function saveDraftSettings(app, patch) {
+  const next = Object.assign({}, getDraftSettings(app), patch);
+  try { localStorage.setItem("wcDraftSettings", JSON.stringify(next)); } catch (e) {}
+  if ("seed" in patch) app._draftSeedPull = 0; // zmiana ziarna zawsze zaczyna sekwencję od nowa
+  app.setState({ draftSettings: next });
+}
+
+/** mulberry32 - mały, szybki, deterministyczny PRNG (nie do celów kryptograficznych, tylko powtarzalne losowanie w zabawie). */
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+/**
+ * Zwraca funkcję losującą [0,1) do użycia w TYM konkretnym pociągnięciu dźwigni. Bez
+ * ustawionego ziarna - zwykłe Math.random (jak dotychczas). Z ziarnem - deterministyczna
+ * funkcja zależna od (ziarno + numer pociągnięcia): to samo ziarno zawsze daje tę samą
+ * SEKWENCJĘ wyników przy kolejnych pociągnięciach (przydatne np. żeby udowodnić uczciwość
+ * losowania, powtarzając je na oczach graczy), ale nie zamraża wyniku na jedno pociągnięcie
+ * w kółko - licznik pociągnięć resetuje się tylko przy zmianie samego ziarna.
+ */
+function draftRandomFn(app) {
+  const seed = (getDraftSettings(app).seed || "").trim();
+  if (!seed) return Math.random;
+  const pull = app._draftSeedPull || 0; app._draftSeedPull = pull + 1;
+  const str = seed + ":" + pull;
+  let h = 1779033703 ^ str.length;
+  for (let i = 0; i < str.length; i++) { h = Math.imul(h ^ str.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19); }
+  return mulberry32((h ^ (h >>> 16)) >>> 0);
+}
+function shuffleWith(arr, rnd) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); const tmp = a[i]; a[i] = a[j]; a[j] = tmp; }
+  return a;
+}
+
+const DRAFT_TIER_ORDER = ["IRON", "BRONZE", "SILVER", "GOLD", "PLATINUM", "EMERALD", "DIAMOND", "MASTER", "GRANDMASTER", "CHALLENGER"];
+const DRAFT_SUBRANK_ORDER = { IV: 0, III: 1, II: 2, I: 3 };
+/** Liczbowa "siła" gracza wg rangi solo/duo (soloTier/soloRank/soloLP z Arkusza) - do balansowania drużyn. Gracz bez znanej rangi (custom/niesklasyfikowany) dostaje 0, czyli traktowany jest jako najsłabszy - lepsze to niż pominięcie go w balansowaniu. */
+function draftRankScore(app, p) {
+  const raw = p.puuid && app.state.playersByPuuid ? app.state.playersByPuuid[p.puuid] : null;
+  if (!raw) return 0;
+  const tierIdx = DRAFT_TIER_ORDER.indexOf(String(raw.soloTier || "").toUpperCase());
+  if (tierIdx < 0) return 0;
+  const subIdx = DRAFT_SUBRANK_ORDER[String(raw.soloRank || "").toUpperCase()] || 0;
+  return tierIdx * 400 + subIdx * 100 + Math.min(99, Number(raw.soloLP) || 0);
+}
+
+/**
+ * Przydziela graczy z puli do 5 ról jednej drużyny, próbując uszanować (w tej kolejności
+ * ważności): role zablokowane przez gracza (roleBlock - "role, których nie gra") i unikanie
+ * roli z jego ostatniego odnotowanego meczu (avoidPreviousRole), zgodnie z flagami w
+ * ustawieniach. Zachłanny algorytm best-effort: gdy dla danej roli nie ma już żadnego w pełni
+ * "czystego" kandydata, ogranicznik jest po kolei rozluźniany (najpierw avoidPreviousRole,
+ * potem nawet roleBlock), żeby WSZYSCY gracze zawsze trafili na jakiś slot - lepsze
+ * niepełne dopasowanie niż odmowa przydziału.
+ */
+function assignRolesForPool(app, poolPlayers, rnd) {
+  const settings = getDraftSettings(app);
+  const roleBlock = app.state.roleBlock || {};
+  const lastRole = (p) => { const ms = p.matches || []; const last = ms.reduce((mx, m) => (!mx || (m.gid || 0) > (mx.gid || 0) ? m : mx), null); return last ? last.role : null; };
+  const roles = shuffleWith(DRAFT_ROLES, rnd);
+  let remaining = shuffleWith(poolPlayers, rnd);
+  const result = {};
+  roles.forEach((role) => {
+    if (!remaining.length) return; // pula wyczerpana wcześniej niż role - slot zostaje pusty, tak jak dotychczas przy niepełnych drużynach
+    const eligible = (relaxAvoid, relaxBlock) => remaining.filter((p) => {
+      if (!relaxBlock && settings.respectRoleBlock && (roleBlock[p.key] || {})[role]) return false;
+      if (!relaxAvoid && settings.avoidPreviousRole && lastRole(p) === role) return false;
+      return true;
+    });
+    let candidates = eligible(false, false);
+    if (!candidates.length) candidates = eligible(true, false);
+    if (!candidates.length) candidates = eligible(true, true);
+    if (!candidates.length) candidates = remaining;
+    const pick = candidates[Math.floor(rnd() * candidates.length)];
+    result[role] = pick.key;
+    remaining = remaining.filter((p) => p !== pick);
+  });
+  return result;
+}
+
 function emptyDraft() { return { blue: { TOP: null, JNG: null, MID: null, BOT: null, SUP: null }, red: { TOP: null, JNG: null, MID: null, BOT: null, SUP: null } }; }
 function getDraftAssign(app) { return app.state.draftAssign || emptyDraft(); }
 function getAllDraftPlayers(app) { return Object.assign({}, app.state.agg.players, app.state.customPlayers || {}); }
@@ -30,11 +126,12 @@ function champPool(app) {
   app._champPool = arr.length ? arr : Object.entries(window.LOLData.CHAMP_STATIC).map(([id, a]) => ({ champId: +id, champKey: a[0], champName: a[1] }));
   return app._champPool;
 }
-function randomChamp(app) { const p = champPool(app); return p[Math.floor(Math.random() * p.length)]; }
+function randomChampWith(app, rnd) { const p = champPool(app); return p[Math.floor(rnd() * p.length)]; }
+function randomChamp(app) { return randomChampWith(app, Math.random); }
 
 function rerollChamp(app, side, role) {
   const fk = side + ":" + role; const dc = Object.assign({}, app.state.draftChamp || {});
-  const cur = dc[fk]; if (!cur || cur.rerolls >= 3) return;
+  const cur = dc[fk]; if (!cur || cur.rerolls >= getDraftSettings(app).rerollLimit) return;
   const c = randomChamp(app);
   dc[fk] = { champId: c.champId, champKey: c.champKey, champName: c.champName, rerolls: cur.rerolls + 1 };
   app.setState({ draftChamp: dc });
@@ -120,6 +217,48 @@ function addPlayerModal(app) {
         h("button", { onClick: close, style: { cursor: "pointer", padding: "12px 20px", borderRadius: 11, border: "1px solid " + t.line2, background: "transparent", color: t.mut, fontWeight: 700, fontSize: 14, fontFamily: t.disp } }, "Anuluj"))));
 }
 
+function draftFlagToggle(app, t, key, label, hint) {
+  const settings = getDraftSettings(app);
+  const on = !!settings[key];
+  return h("button", {
+    key, onClick: () => saveDraftSettings(app, { [key]: !on }),
+    style: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10, width: "100%", textAlign: "left", cursor: "pointer", padding: "10px 12px", borderRadius: 9, border: "1px solid " + (on ? "rgba(90,200,255,.4)" : t.line2), background: on ? "rgba(90,200,255,.1)" : "transparent", marginBottom: 8 }
+  },
+    h("div", null,
+      h("div", { style: { fontSize: 13.5, fontWeight: 700, color: t.text, fontFamily: t.disp } }, label),
+      hint ? h("div", { style: { fontSize: 11, color: t.faint, marginTop: 2 } }, hint) : null),
+    h("span", { style: { flex: "0 0 auto", fontSize: 13, fontWeight: 800, color: on ? t.accent : t.faint } }, on ? "✓" : "—"));
+}
+
+function draftSettingsModal(app) {
+  const t = app.theme();
+  const settings = getDraftSettings(app);
+  const close = () => app.setState({ draftSettingsOpen: false });
+  const inputStyle = { width: "100%", background: t.panel2, color: t.text, border: "1px solid " + t.line2, borderRadius: 9, padding: "9px 11px", fontSize: 13.5, fontFamily: t.disp, outline: "none" };
+  return h("div", { key: "draftsettings", onClick: close, style: { position: "fixed", inset: 0, zIndex: 60, background: "rgba(6,8,18,.8)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, animation: "lolFade .2s ease" } },
+    h("div", { onClick: (e) => e.stopPropagation(), style: { width: "100%", maxWidth: 440, background: t.panel, border: "1px solid rgba(90,200,255,.3)", borderRadius: 18, overflow: "hidden", boxShadow: "0 24px 70px rgba(0,0,0,.6), 0 0 30px rgba(90,200,255,.15)", animation: "lolPop .22s ease" } },
+      h("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 22px", borderBottom: "1px solid " + t.line } },
+        h("div", null,
+          h("div", { style: { fontFamily: t.disp, fontWeight: 700, fontSize: 19, textShadow: "0 0 14px rgba(90,200,255,.4)" } }, "Ustawienia losowania"),
+          h("div", { style: { fontSize: 12, color: t.faint, marginTop: 2 } }, "Zmiany zapisują się automatycznie")),
+        h("button", { onClick: close, style: { width: 32, height: 32, borderRadius: 9, border: "1px solid " + t.line2, background: "rgba(0,0,0,.25)", color: t.text, cursor: "pointer", fontSize: 16 } }, "✕")),
+      h("div", { style: { display: "flex", flexDirection: "column", gap: 14, padding: "20px 22px" } },
+        h("div", null,
+          h("div", { style: monoLabel(t) }, "Liczba rerolli postaci na slot"),
+          h("input", { type: "number", min: 0, max: 10, value: settings.rerollLimit, onChange: (e) => saveDraftSettings(app, { rerollLimit: Math.max(0, Math.min(10, +e.target.value || 0)) }), style: inputStyle })),
+        h("div", null,
+          h("div", { style: monoLabel(t) }, "Ziarno losowania (puste = zawsze inny wynik)"),
+          h("div", { style: { display: "flex", gap: 8 } },
+            h("input", { value: settings.seed, onChange: (e) => saveDraftSettings(app, { seed: e.target.value }), placeholder: "np. finał-turnieju-2026", style: inputStyle }),
+            h("button", { onClick: () => saveDraftSettings(app, { seed: "" }), title: "Wyczyść ziarno", style: { flex: "0 0 auto", cursor: "pointer", padding: "0 14px", borderRadius: 9, border: "1px solid " + t.line2, background: "transparent", color: t.mut, fontWeight: 700, fontSize: 13, fontFamily: t.disp } }, "✕")),
+          h("div", { style: { fontSize: 11, color: t.faint, marginTop: 6 } }, "To samo ziarno zawsze daje tę samą serię wyników po kolei (np. do uczciwego powtórzenia losowania na oczach graczy).")),
+        h("div", null,
+          h("div", { style: Object.assign({}, monoLabel(t), { marginBottom: 8 }) }, "Flagi"),
+          draftFlagToggle(app, t, "respectRoleBlock", "Respektuj zablokowane role", "Nie przydzielaj graczowi roli, które oznaczył jako \"nie gra\" (⚙ na karcie gracza)."),
+          draftFlagToggle(app, t, "avoidPreviousRole", "Unikaj roli z poprzedniego meczu", "Stara się nie dać graczowi tej samej roli, co w jego ostatnim odnotowanym meczu."),
+          draftFlagToggle(app, t, "balanceByRank", "Balansuj drużyny wg rangi", "Przy losowaniu graczy (obie drużyny) dzieli graczy tak, by łączna ranga obu stron była możliwie równa - zamiast czysto losowo.")))));
+}
+
 function leverModes(app) {
   return {
     gold: { c1: "#ffcf4a", c2: "#e8912b", glow: "rgba(255,200,80,", sun: "linear-gradient(180deg,#fff3c4 0%,#ffcf4a 45%,#e8912b 100%)", label: "Losuje postacie", action: () => rollChamps(app) },
@@ -156,7 +295,8 @@ function rollChamps(app) {
   const order = [];
   ["blue", "red"].forEach((s) => DRAFT_ROLES.forEach((r) => { if (a[s][r]) order.push(s + ":" + r); }));
   if (!order.length) { app.toast("Najpierw dodaj graczy do slotów", true); return; }
-  const final = {}; order.forEach((fk) => { const c = randomChamp(app); final[fk] = { champId: c.champId, champKey: c.champKey, champName: c.champName, rerolls: 0 }; });
+  const rnd = draftRandomFn(app);
+  const final = {}; order.forEach((fk) => { const c = randomChampWith(app, rnd); final[fk] = { champId: c.champId, champKey: c.champKey, champName: c.champName, rerolls: 0 }; });
   const disp = {}; order.forEach((fk) => { const c = randomChamp(app); disp[fk] = { champId: c.champId, champKey: c.champKey, champName: c.champName, rerolls: 0 }; });
   app._champRoll = { order, final, locked: {}, last: {}, flashAt: {}, t0: performance.now() };
   playRollSound(app);
@@ -188,14 +328,16 @@ function rollTeams(app, scopeArg) {
   const final = emptyDraft();
   const order = [];
   let poolKeys;
+  const rnd = draftRandomFn(app);
+  const settings = getDraftSettings(app);
 
   if (scope === "team") {
     let anyTeam = false;
     ["blue", "red"].forEach((side) => {
-      const keys = DRAFT_ROLES.map((r) => cur[side][r]).filter(Boolean);
-      if (keys.length) anyTeam = true;
-      for (let i = keys.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const tmp = keys[i]; keys[i] = keys[j]; keys[j] = tmp; }
-      keys.forEach((k, i) => { final[side][DRAFT_ROLES[i]] = k; order.push([side, DRAFT_ROLES[i]]); });
+      const teamPlayers = DRAFT_ROLES.map((r) => cur[side][r]).filter(Boolean).map((k) => players[k]).filter(Boolean);
+      if (teamPlayers.length) anyTeam = true;
+      const roleMap = assignRolesForPool(app, teamPlayers, rnd);
+      DRAFT_ROLES.forEach((r) => { if (roleMap[r]) { final[side][r] = roleMap[r]; order.push([side, r]); } });
     });
     if (!anyTeam) { app.toast("Najpierw przypisz graczy do drużyn", true); return; }
     poolKeys = Object.keys(getDraftUsed(app));
@@ -204,10 +346,32 @@ function rollTeams(app, scopeArg) {
     const assigned = Object.keys(getDraftUsed(app));
     const pool = (assigned.length >= 2 ? assigned : Object.keys(players)).map((k) => players[k]).filter(Boolean);
     if (pool.length < 2) { app.toast("Dodaj co najmniej 2 graczy", true); return; }
-    const shuffled = pool.slice();
-    for (let i = shuffled.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const tmp = shuffled[i]; shuffled[i] = shuffled[j]; shuffled[j] = tmp; }
-    let idx = 0;
-    for (let s = 0; s < 5; s++) { for (const side of ["blue", "red"]) { if (idx < shuffled.length) { final[side][DRAFT_ROLES[s]] = shuffled[idx++].key; order.push([side, DRAFT_ROLES[s]]); } } }
+
+    let blueTeam, redTeam;
+    if (settings.balanceByRank) {
+      // Zachłanne balansowanie: gracze wg malejącej rangi trafiają kolejno do drużyny, która
+      // ma na razie NIŻSZĄ łączną siłę - standardowy algorytm na możliwie równe drużyny
+      // (dokładniejszy niż samo naprzemienne rozdawanie po przetasowaniu).
+      const ranked = pool.slice().sort((a, b) => draftRankScore(app, b) - draftRankScore(app, a));
+      blueTeam = []; redTeam = [];
+      let blueSum = 0, redSum = 0;
+      ranked.forEach((p) => {
+        const score = draftRankScore(app, p);
+        if (blueTeam.length < 5 && (blueSum <= redSum || redTeam.length >= 5)) { blueTeam.push(p); blueSum += score; }
+        else { redTeam.push(p); redSum += score; }
+      });
+    } else {
+      const shuffled = shuffleWith(pool, rnd);
+      blueTeam = []; redTeam = [];
+      shuffled.forEach((p) => { (blueTeam.length <= redTeam.length && blueTeam.length < 5 ? blueTeam : redTeam).push(p); });
+    }
+
+    const blueRoles = assignRolesForPool(app, blueTeam, rnd);
+    const redRoles = assignRolesForPool(app, redTeam, rnd);
+    DRAFT_ROLES.forEach((r) => {
+      if (blueRoles[r]) { final.blue[r] = blueRoles[r]; order.push(["blue", r]); }
+      if (redRoles[r]) { final.red[r] = redRoles[r]; order.push(["red", r]); }
+    });
     poolKeys = pool.map((p) => p.key);
   }
 
@@ -272,8 +436,8 @@ function draftSlot(app, side, role) {
       (p && champ) ? h("div", { style: { position: "absolute", left: 0, right: 0, bottom: 0, display: "flex", alignItems: "center", gap: 7, padding: "20px 7px 7px", background: "linear-gradient(to top,rgba(5,4,10,.94),transparent)" } },
         h("div", { style: { minWidth: 0, flex: 1 } },
           h("div", { style: { fontSize: 12.5, fontWeight: 700, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, champ.champName),
-          h("div", { style: { fontSize: 9, color: "rgba(255,255,255,.5)", fontFamily: t.mono } }, "reroll " + champ.rerolls + "/3")),
-        (!rolling && !app.state.rollingChamps && champ.rerolls < 3) ? h("button", { onClick: (e) => { e.stopPropagation(); rerollChamp(app, side, role); }, title: "Losuj postać ponownie", style: { flex: "0 0 auto", cursor: "pointer", width: 26, height: 26, borderRadius: 7, border: "1px solid rgba(90,200,255,.4)", background: "rgba(90,200,255,.14)", color: "#dff3ff", fontSize: 13 } }, "⟳") : null) : null),
+          h("div", { style: { fontSize: 9, color: "rgba(255,255,255,.5)", fontFamily: t.mono } }, "reroll " + champ.rerolls + "/" + getDraftSettings(app).rerollLimit)),
+        (!rolling && !app.state.rollingChamps && champ.rerolls < getDraftSettings(app).rerollLimit) ? h("button", { onClick: (e) => { e.stopPropagation(); rerollChamp(app, side, role); }, title: "Losuj postać ponownie", style: { flex: "0 0 auto", cursor: "pointer", width: 26, height: 26, borderRadius: 7, border: "1px solid rgba(90,200,255,.4)", background: "rgba(90,200,255,.14)", color: "#dff3ff", fontSize: 13 } }, "⟳") : null) : null),
     h("div", { style: { display: "flex", alignItems: "center", gap: 8, padding: "10px 9px", borderTop: "1px solid " + t.line, background: "rgba(0,0,0,.32)" } },
       draftRoleIcon(role, 20),
       h("span", { style: { fontFamily: t.disp, fontWeight: 700, fontSize: 16, color: p ? t.text : t.faint, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: 1, textAlign: "center" } }, p ? (p.nick || p.summoner) : "—")),
@@ -307,7 +471,8 @@ function renderDraftView(app) {
 
   return h("div", { style: { padding: "34px 40px 60px", maxWidth: 1240, margin: "0 auto", animation: "lolFade .35s ease" } },
     h("div", { style: { display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 18 } },
-      h("span", { style: { fontSize: 13, color: t.mut } }, usedCount + "/10 slotów zajętych")),
+      h("span", { style: { fontSize: 13, color: t.mut } }, usedCount + "/10 slotów zajętych"),
+      h("button", { onClick: () => app.setState({ draftSettingsOpen: true }), title: "Ustawienia losowania", style: { flex: "0 0 auto", cursor: "pointer", width: 26, height: 26, borderRadius: 8, border: "1px solid " + t.line2, background: "transparent", color: t.faint, fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" } }, "⚙")),
     h("div", { style: { display: "grid", gridTemplateColumns: "210px minmax(0,1fr)", gap: 22, alignItems: "stretch" } },
       h("div", { style: { position: "relative", minHeight: 0 } },
         h("div", { style: { position: "absolute", inset: 0, background: t.panel, border: "1px solid " + t.line, borderRadius: 14, overflow: "hidden", display: "flex", flexDirection: "column" } },
@@ -337,7 +502,8 @@ function renderDraftView(app) {
             h("span", { style: { fontFamily: t.mono, fontSize: 15, fontWeight: 700, color: "#dff3ff", background: "rgba(90,200,255,.14)", border: "1px solid rgba(90,200,255,.4)", borderRadius: 8, padding: "4px 12px", letterSpacing: 1, textShadow: "0 0 10px rgba(90,200,255,.5)" } }, "GID #" + gid)),
           draftTeamPanel(app, "red")),
         h("div", { style: { display: "flex", flexDirection: "column", alignSelf: "stretch" } }, casinoLever(app, app.state.rolling || app.state.rollingChamps)))),
-    app.state.addPlayerOpen ? addPlayerModal(app) : null);
+    app.state.addPlayerOpen ? addPlayerModal(app) : null,
+    app.state.draftSettingsOpen ? draftSettingsModal(app) : null);
 }
 
 window.BrowserViews.draft = renderDraftView;
